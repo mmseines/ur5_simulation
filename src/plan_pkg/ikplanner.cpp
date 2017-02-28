@@ -147,7 +147,8 @@ int main(int argc, char **argv)
 			0,1,0,0,
 			0,0,1,0,
 			0,0,0,1,
-		};
+	};
+
 	KDL::Frame frame;
 
 	while(std::getline(f, line))
@@ -156,6 +157,7 @@ int main(int argc, char **argv)
 			IDEA: Rewrite this to operate on start position and goal position. 
 						- Test if that makes anything more simple. 
 		*/
+
 		double pose [6];
 		getPose(line, pose);
 
@@ -279,15 +281,14 @@ void getTransform(double * pose, double tf[][4]){
 	double pitch = pose[4];
 	double yaw = pose[5];
 	
-//top row
 	tf[0][0] = cos(yaw)*cos(pitch);
 	tf[0][1] = cos(yaw)*sin(pitch)*sin(roll) - sin(yaw)*cos(roll);
 	tf[0][2] = cos(yaw)*sin(pitch)*cos(roll) + sin(yaw)*sin(roll);
-//middle row
+
 	tf[1][0] = sin(yaw)*cos(pitch);
 	tf[1][1] = sin(yaw)*sin(pitch)*sin(roll) + cos(yaw)*cos(roll);	
 	tf[1][2] = sin(yaw)*sin(pitch)*cos(roll) - cos(yaw)*sin(roll);
-//bottom row
+
 	tf[2][0] = -sin(pitch);
 	tf[2][1] = cos(pitch)*sin(roll);
 	tf[2][2] = cos(pitch)*cos(roll);
