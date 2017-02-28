@@ -1,0 +1,6 @@
+/home/magnus/Documents/path_ctrl/install/_setup_util.py
+/home/magnus/Documents/path_ctrl/install/env.sh
+/home/magnus/Documents/path_ctrl/install/setup.bash
+/home/magnus/Documents/path_ctrl/install/setup.sh
+/home/magnus/Documents/path_ctrl/install/setup.zsh
+/home/magnus/Documents/path_ctrl/install/.rosinstall

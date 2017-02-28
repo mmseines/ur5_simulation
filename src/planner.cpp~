@@ -1,0 +1,59 @@
+
+#include<ros/ros.h>
+#include<fstream>
+#include <ros/package.h>
+#include "tf/tf.h"
+
+#include <geometry_msgs/Pose.h>
+
+// MoveIt!
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <moveit/planning_interface/planning_interface.h>
+#include <moveit/move_group_interface/move_group.h>
+#include <moveit_msgs/PlanningScene.h>
+#include <moveit_msgs/AttachedCollisionObject.h>
+#include <moveit_msgs/GetStateValidity.h>
+#include <moveit_msgs/DisplayRobotState.h>
+
+#include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit/robot_state/robot_state.h>
+#include <moveit/robot_state/conversions.h>
+
+
+int main(int argc, char **argv)
+{
+	ros::init(argc, argv, "path_sim");
+	ros::NodeHandle n;
+	
+
+	robot_model_loader::RobotModelLoader robot_model_loader("$(find ur5_moveit_config)/config/ur5.srdf");
+  robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
+	moveit::planning_scene::PlanningScenePtr planning_scene(new(planning_scene::PlanningScene(robot_model)));
+
+	//moveit::planning_interface::MoveGroup group("endeffector");
+	//moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+	
+	std::fstream f;
+	//f.open(ros::package::getPath("planner")+"/paths/path.csv");
+
+	//tf::Quaternion q = tf::createQuaternionFromRPY(s[3], s[4], s[5]);
+	
+	geometry_msgs::Pose target_pose1;
+	/*
+	target_pose1.orientation.x = q.x();
+	target_pose1.orientation.y = q.y();
+	target_pose1.orientation.z = q.z();
+	target_pose1.orientation.w = q.w();
+	target_pose1.position.x = s[0];
+	target_pose1.position.y = s[1];
+	target_pose1.position.z = s[2];
+*/
+	//group.setPoseTarget(target_pose1);
+
+	//moveit::planning_interface::MoveGroup::Plan my_plan;
+	//bool success = group.plan(my_plan);
+	sleep(1.0);
+
+return 0;
+
+}

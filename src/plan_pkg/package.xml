@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package>
+  <name>plan_pkg</name>
+  <version>1.0.0</version>
+  <description>the thingy</description>
+
+  <maintainer email="pop@pop.com">pop</maintainer>
+  <license>Distributed for research use</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>roslib</build_depend>
+	<build_depend>moveit</build_depend>
+	<build_depend>move_group</build_depend>
+  <run_depend>rospy</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>roslib</run_depend>
+	<run_depend>moveit</run_depend>
+	<run_depend>move_group</run_depend>
+
+  <export>
+		
+  </export>
+</package>

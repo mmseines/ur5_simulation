@@ -1,0 +1,2 @@
+plan_pkg
+-DCATKIN_DEVEL_PREFIX=/home/magnus/Documents/path_ctrl/devel -DCMAKE_INSTALL_PREFIX=/home/magnus/Documents/path_ctrl/install -G Unix Makefiles
