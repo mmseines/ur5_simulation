@@ -34,11 +34,12 @@
 //#include <descartes_moveit/moveit_state_adapter.h>
 #include <urdf/model.h>
 #include <eigen_conversions/eigen_kdl.h>
+#include <kdl_parser/kdl_parser.hpp>
 #include <tf_conversions/tf_kdl.h>
 #include <ur_kinematics/ur_kin.h>
 
 //Action lib
-#include <actionlib/client/simple_action_client.h>
+//#include <actionlib/client/simple_action_client.h>
 
 
 
@@ -84,23 +85,16 @@ int main(int argc, char **argv)
   // Get name from the ROS param server, and then load the planner
   if (!n.getParam("planning_plugin", planner_plugin_name))
     ROS_FATAL_STREAM("Could not find planner plugin name");
-  try
-  {
+  try{
     planner_plugin_loader.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>("moveit_core", "planning_interface::PlannerManager"));
-  }
-  catch(pluginlib::PluginlibException& ex)
-  {
+  }catch(pluginlib::PluginlibException& ex){
     ROS_FATAL_STREAM("Exception while creating planning plugin loader " << ex.what());
-  }
-  try
-  {
+  }try{
     planner_instance.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
     if (!planner_instance->initialize(robot_model, n.getNamespace()))
       ROS_FATAL_STREAM("Could not initialize planner instance");
     ROS_INFO_STREAM("Using planning interface '" << planner_instance->getDescription() << "'");
-  }
-  catch(pluginlib::PluginlibException& ex)
-  {
+  }catch(pluginlib::PluginlibException& ex){
     const std::vector<std::string> &classes = planner_plugin_loader->getDeclaredClasses();
     std::stringstream ss;
     for (std::size_t i = 0 ; i < classes.size() ; ++i)
@@ -142,14 +136,9 @@ int main(int argc, char **argv)
 
 	int count = 0;
 	
-	double tf_matrix[4][4] = {
-			1,0,0,0,
-			0,1,0,0,
-			0,0,1,0,
-			0,0,0,1,
-	};
+	double tf_matrix[4][4];
 
-	KDL::Frame frame;
+	//KDL::Frame kdl_pose;
 
 	while(std::getline(f, line))
 	{	
@@ -165,35 +154,58 @@ int main(int argc, char **argv)
 	
 		geometry_msgs::Pose viewpoint;
 
+		pose[0] = pose[0]/scale;
+		pose[1] = pose[1]/scale;
+		pose[2] = pose[2]/scale;
+
 		viewpoint.orientation.x = q.x();
 		viewpoint.orientation.y = q.y();
 		viewpoint.orientation.z = q.z();
 		viewpoint.orientation.w = q.w();
-		viewpoint.position.x = (pose[0]/scale);
-		viewpoint.position.y = (pose[1]/scale);
-		viewpoint.position.z = (pose[2]/scale);
+		viewpoint.position.x = (pose[0])+ 0.2;
+		viewpoint.position.y = (pose[1]);
+		viewpoint.position.z = (pose[2]);
 
-		frame.Make4x4( (double*) tf_matrix);
-
-		ROS_INFO("THIS IS FINE");
+		getTransform(pose,tf_matrix);
 		//Need to fix the pose matrix.
-		double q_ik_sols[8][6]; 
+		double q_ik_sols[8][6];
+		std::vector< std::vector<double> > valid_solutions;
 
-		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.001f);
+		//int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f); //Last variable defaults to 0.0f, but is added to remember that it is there. 
 		//Need to check validity of theese solutions though...
-
-		ROS_INFO("Inverse kinematics gave: %i, solutions", num_sols); 
+		//for(int i = 0; i < num_sols; i++){
+		//	std::vector<double> val_sol;
+			// Push back points one by one, checking validity, changing them if necessary. 						
+			// Check for nans
+			// Check for limit violations, and if +/- 2pi solves this violation.  
+			// 
+		//}
 		
-		//bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
+		//ROS_INFO("Inverse kinematics gave: %i, solutions where %i where valid", num_sols, (int) valid_solutions.size()); 
+		
+		
+		bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
 		
 
 		/*
 			Consider using ros descartes_moveit wrapper, as it contains this type of functionallity.
-		
+		*/
 
 		if (found_ik)
 		{
+			
+			//joint_values.clear();
+			/*			
+			joint_values.push_back(q_ik_sols[0][0]);
+			joint_values.push_back(q_ik_sols[0][1]);
+			joint_values.push_back(q_ik_sols[0][2]);
+			joint_values.push_back(q_ik_sols[0][3]);
+			joint_values.push_back(q_ik_sols[0][4]);
+			joint_values.push_back(q_ik_sols[0][5]);			
+			*/
   		kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
+
+			
 
 			ROS_INFO("Succesful IK for viewpoint number: %i", count); 
 			planning_scene->setCurrentState(*group.getCurrentState());
@@ -205,10 +217,10 @@ int main(int argc, char **argv)
   		req.goal_constraints.clear();
 			req.goal_constraints.push_back(joint_goal);		
 
-			/* Call the Planner 
+			/* Call the Planner */
 			planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
   		context->solve(res);
-  		/* Check that the planning was successful 
+  		/* Check that the planning was successful */
   		if(res.error_code_.val != res.error_code_.SUCCESS)
   		{
    			ROS_ERROR("Could not compute plan successfully... printing goal");
@@ -222,7 +234,7 @@ int main(int argc, char **argv)
 			}else{
 				/*
 					Apparantly the planning was sucessfull. 								
-				
+				*/
 				res.getMessage(response);				
 				moveit::planning_interface::MoveGroup::Plan plan;
 				moveit_msgs::RobotTrajectory trajectory = response.trajectory;
@@ -238,9 +250,10 @@ int main(int argc, char **argv)
 				plan.start_state_ = response.trajectory_start;			
 				plan.trajectory_ = trajectory;
 				
-				
 				//And this works somehow.
-				group.execute(plan);  
+				group.execute(plan);
+				//ros::Duration(0.5).sleep();
+				
 
 			}
 
@@ -248,10 +261,7 @@ int main(int argc, char **argv)
 
 		}else{
   		ROS_ERROR("Did not find IK solution for viewpoint %i", count);
-			double dist = std::sqrt(pow(viewpoint.position.x,2.0) +	pow(viewpoint.position.y,2.0)+ pow(viewpoint.position.z,2.0));	
-			ROS_ERROR("The viewpoint has a distance of %0.2f from the base joint", dist);
 		}
-		*/
 		count++;
 		
 	}
@@ -281,6 +291,7 @@ void getTransform(double * pose, double tf[][4]){
 	double pitch = pose[4];
 	double yaw = pose[5];
 	
+//Standard Rot matrix from RPY.
 	tf[0][0] = cos(yaw)*cos(pitch);
 	tf[0][1] = cos(yaw)*sin(pitch)*sin(roll) - sin(yaw)*cos(roll);
 	tf[0][2] = cos(yaw)*sin(pitch)*cos(roll) + sin(yaw)*sin(roll);
