@@ -42,7 +42,6 @@
 //#include <actionlib/client/simple_action_client.h>
 
 
-
 int main(int argc, char **argv)
 {
 /*
@@ -140,6 +139,8 @@ int main(int argc, char **argv)
 
 	//KDL::Frame kdl_pose;
 
+	double prev_state[6];
+
 	while(std::getline(f, line))
 	{	
 		/*
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
 		double pose [6];
 		getPose(line, pose);
 
-		tf::Quaternion q = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);
+		tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);
 	
 		geometry_msgs::Pose viewpoint;
 
@@ -158,10 +159,10 @@ int main(int argc, char **argv)
 		pose[1] = pose[1]/scale;
 		pose[2] = pose[2]/scale;
 
-		viewpoint.orientation.x = q.x();
-		viewpoint.orientation.y = q.y();
-		viewpoint.orientation.z = q.z();
-		viewpoint.orientation.w = q.w();
+		viewpoint.orientation.x = qt.x();
+		viewpoint.orientation.y = qt.y();
+		viewpoint.orientation.z = qt.z();
+		viewpoint.orientation.w = qt.w();
 		viewpoint.position.x = (pose[0])+ 0.2;
 		viewpoint.position.y = (pose[1]);
 		viewpoint.position.z = (pose[2]);
@@ -171,44 +172,52 @@ int main(int argc, char **argv)
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
 
-		//int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f); //Last variable defaults to 0.0f, but is added to remember that it is there. 
+		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f); //Last variable defaults to 0.0f, but is added to remember that it is there. 
 		//Need to check validity of theese solutions though...
-		//for(int i = 0; i < num_sols; i++){
-		//	std::vector<double> val_sol;
-			// Push back points one by one, checking validity, changing them if necessary. 						
-			// Check for nans
-			// Check for limit violations, and if +/- 2pi solves this violation.  
-			// 
-		//}
+		for(int i = 0; i < num_sols; i++){
+			std::vector<double> val_sol;
+			for(int q = 0; q < 6; q++){
+				if (q_ik_sols[i][q] != q_ik_sols[i][q]){ //Check for nan
+					break;				
+				}else if( abs(q_ik_sols[i][q]) > M_PI){
+						q_ik_sols[i][q] -= sgn(q_ik_sols)*2*M_PI; 
+						if(abs(q_ik_sols[i][q]) >= M_PI){
+							break;
+						} 
+				}  
+				val_sol.push_back(q_ik_sols[i][q]);
+			}
+			if(val_sol.size() == 6){
+					valid_solutions.push_back(val_sol);
+			}
+			val_sol.clear();  				
+		}
 		
-		//ROS_INFO("Inverse kinematics gave: %i, solutions where %i where valid", num_sols, (int) valid_solutions.size()); 
+		ROS_INFO("Inverse kinematics gave: %i, solutions where %i where valid", num_sols, (int) valid_solutions.size()); 
 		
-		
-		bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
+		//bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
 		
 
 		/*
 			Consider using ros descartes_moveit wrapper, as it contains this type of functionallity.
 		*/
 
-		if (found_ik)
+		if (valid_solutions.size() != 0)
 		{
 			
-			//joint_values.clear();
-			/*			
-			joint_values.push_back(q_ik_sols[0][0]);
-			joint_values.push_back(q_ik_sols[0][1]);
-			joint_values.push_back(q_ik_sols[0][2]);
-			joint_values.push_back(q_ik_sols[0][3]);
-			joint_values.push_back(q_ik_sols[0][4]);
-			joint_values.push_back(q_ik_sols[0][5]);			
-			*/
-  		kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
-
+			planning_scene->setCurrentState(*group.getCurrentState());
+			//Get the current joint state. 
+			for(int i = 0; i > valid_solutions.size(); i++) {
+				double min_distance = FLT_MAX;
+			}
+				
+  		//kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
+			
+			joint_values.clear();
+			joint_values = valid_solutions[1];
 			
 
 			ROS_INFO("Succesful IK for viewpoint number: %i", count); 
-			planning_scene->setCurrentState(*group.getCurrentState());
 
 			//Define goals etc.
 			robot_state::RobotState goal_state(robot_model);
@@ -310,6 +319,14 @@ void getTransform(double * pose, double tf[][4]){
 	tf[2][3] = pose[2]; 
 
 	return;
+}
+
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+double weighted_distance(double p[], std::vector<double> v){
+	return; 
 }
 
 

@@ -56,14 +56,14 @@ int main(int argc, char **argv)
 	spinner.start();
 
 	//ROS_INFO("running loader");
-	robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-  robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
+	//robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
+  //robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
 	//ROS_INFO("Model frame: %s", robot_model->getModelFrame().c_str());
 
 	moveit::planning_interface::MoveGroup group("manipulator");
-	moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+	//moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 	
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/path.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/detailedPath.csv");
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
 	if( !f.is_open())
 		return 0;
@@ -72,6 +72,7 @@ int main(int argc, char **argv)
 	
 	std::vector<geometry_msgs::Pose> waypoints;
 
+	double scale = 100;
 
 	int count  = -1;
 	while(std::getline(f, line))
@@ -89,14 +90,16 @@ int main(int argc, char **argv)
 		pose1.orientation.y = q.y();
 		pose1.orientation.z = q.z();
 		pose1.orientation.w = q.w();
-		pose1.position.x = pose[0];
-		pose1.position.y = pose[1];
-		pose1.position.z = pose[2];
+		pose1.position.x = pose[0]/scale;
+		pose1.position.y = pose[1]/scale;
+		pose1.position.z = pose[2]/scale;
 		ROS_INFO("Adding waypoint x,y,z =  [%.2f, %0.2f, %0.2f]" ,pose[0], pose[1], pose[2]); 
 		
 		
-		waypoints.push_back(pose1);
-		
+		//waypoints.push_back(pose1);
+		group.setPoseTarget(pose1);
+		group.move();
+		/*
 		if(waypoints.size() > 2 || f.eof()){
 			moveit_msgs::RobotTrajectory trajectory;
 		
@@ -173,6 +176,8 @@ int main(int argc, char **argv)
   		plan.trajectory_ = trajectory;
   		group.execute(plan);
 			sleep(0.5);
+	}
+*/
 	}
 	
 return 0;
