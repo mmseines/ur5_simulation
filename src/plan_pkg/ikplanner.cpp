@@ -2,12 +2,14 @@
 	
 */
 //Header
+
 #include "include/ikplanner.hpp"
 
 // ROS message types.
 #include <geometry_msgs/Pose.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
+#include <cmath>
 
 // ROS and "MoveIt!" packages. Some of these are probably not needed. 
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -76,7 +78,7 @@ int main(int argc, char **argv)
 	}	
 
 
-/* -----------------------------Loading planner --------------------- */
+/* -----------------------------Loading planner --------------------- (necessary for constraint based pose goal planning.) */
 	boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
   planning_interface::PlannerManagerPtr planner_instance;
   std::string planner_plugin_name = "ompl_interface/OMPLPlanner";
@@ -117,7 +119,7 @@ int main(int argc, char **argv)
 	moveit_msgs::MotionPlanResponse response;
 /* Specify bounds on the workspace */
 
-	double scale = 100; //Viewpoint planning done in cm, but ros operates with m.
+	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
 
 	req.workspace_parameters.min_corner.z = -0.05;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.7;
@@ -139,7 +141,7 @@ int main(int argc, char **argv)
 
 	//KDL::Frame kdl_pose;
 
-	double prev_state[6];
+	std::vector<double> curr_joint_states;
 
 	while(std::getline(f, line))
 	{	
@@ -163,25 +165,39 @@ int main(int argc, char **argv)
 		viewpoint.orientation.y = qt.y();
 		viewpoint.orientation.z = qt.z();
 		viewpoint.orientation.w = qt.w();
-		viewpoint.position.x = (pose[0])+ 0.2;
+		viewpoint.position.x = (pose[0])+ 0.2; // Testing with a non ideal path. 
 		viewpoint.position.y = (pose[1]);
 		viewpoint.position.z = (pose[2]);
 
-		getTransform(pose,tf_matrix);
-		//Need to fix the pose matrix.
+		//getTransform(pose,tf_matrix); //Own solution... 
+
+		Eigen::Affine3d r = create_rotation_matrix(pose[3], pose[4], pose[5]);
+  	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
+		
+		Eigen::Matrix4d m = (t * r).matrix();	
+	
+		for(int n = 0; n < 4; n++){
+			for(int q = 0; q < 4; q++){
+				tf_matrix[n][q] = m(n, q);
+			}
+		}
+
+
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
 
 		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f); //Last variable defaults to 0.0f, but is added to remember that it is there. 
-		//Need to check validity of theese solutions though...
+		
+//Need to check validity of theese solutions though...
 		for(int i = 0; i < num_sols; i++){
 			std::vector<double> val_sol;
 			for(int q = 0; q < 6; q++){
-				if (q_ik_sols[i][q] != q_ik_sols[i][q]){ //Check for nan
+				if (q_ik_sols[i][q] != q_ik_sols[i][q] || !std::isfinite(q_ik_sols[i][q]) ){ //Check for nan / inf
 					break;				
 				}else if( abs(q_ik_sols[i][q]) > M_PI){
-						q_ik_sols[i][q] -= sgn(q_ik_sols)*2*M_PI; 
-						if(abs(q_ik_sols[i][q]) >= M_PI){
+						q_ik_sols[i][q] -= sgn(q_ik_sols[i][q])*2*M_PI; 
+						if(abs(q_ik_sols[i][q]) > M_PI){
+							//No solution							
 							break;
 						} 
 				}  
@@ -206,18 +222,36 @@ int main(int argc, char **argv)
 		{
 			
 			planning_scene->setCurrentState(*group.getCurrentState());
+
+			//semi temp fix to get current state. 
+			moveit::core::RobotState blah = *group.getCurrentState();
+			blah.copyJointGroupPositions(joint_model_group, curr_joint_states);
+
+			joint_values.clear();			
 			//Get the current joint state. 
-			for(int i = 0; i > valid_solutions.size(); i++) {
-				double min_distance = FLT_MAX;
+			double min_distance = FLT_MAX;			
+			for(int i = 0; i < valid_solutions.size(); i++) {
+				double dis = weighted_distance(curr_joint_states, valid_solutions[i]);
+				if( dis < min_distance){
+					joint_values = valid_solutions[i];
+				}
 			}
 				
   		//kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
-			
+			/*
 			joint_values.clear();
-			joint_values = valid_solutions[1];
-			
-
-			ROS_INFO("Succesful IK for viewpoint number: %i", count); 
+			for(int i = 0; i < valid_solutions.size(); i++){
+				if(valid_solutions[i][2] > 0.0){
+					joint_values.clear();
+					joint_values = valid_solutions[i];
+					break;
+				}
+			}
+*/ 
+			if(joint_values.size() != 6){
+				ROS_ERROR("Error selecting IK solution: %i", count);
+				break;
+			}
 
 			//Define goals etc.
 			robot_state::RobotState goal_state(robot_model);
@@ -238,7 +272,8 @@ int main(int argc, char **argv)
     			ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
   			}
 		
-				//return 0; 
+				//return 0;
+				count++; 
 				continue;
 			}else{
 				/*
@@ -261,17 +296,18 @@ int main(int argc, char **argv)
 				
 				//And this works somehow.
 				group.execute(plan);
-				//ros::Duration(0.5).sleep();
-				
+				ros::Duration(1.0).sleep();
+				sleep(1.0);
 
 			}
 
 
-
+			count++;
 		}else{
   		ROS_ERROR("Did not find IK solution for viewpoint %i", count);
+			count++;		
 		}
-		count++;
+		
 		
 	}
 return 0;
@@ -316,17 +352,38 @@ void getTransform(double * pose, double tf[][4]){
 //position (4th column)
 	tf[0][3] = pose[0];
 	tf[1][3] = pose[1];
-	tf[2][3] = pose[2]; 
+	tf[2][3] = pose[2];
+	tf[3][3] = 1;  
 
 	return;
+}
+
+//Stolen from stackoverflow...
+Eigen::Affine3d create_rotation_matrix(double ax, double ay, double az){
+	Eigen::Affine3d rx =
+      Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
+  Eigen::Affine3d ry =
+      Eigen::Affine3d(Eigen::AngleAxisd(ay, Eigen::Vector3d(0, 1, 0)));
+  Eigen::Affine3d rz =
+      Eigen::Affine3d(Eigen::AngleAxisd(az, Eigen::Vector3d(0, 0, 1)));
+  return rz * ry * rx;
 }
 
 template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
-double weighted_distance(double p[], std::vector<double> v){
-	return; 
+//TODO: implement some meaningful weights to this. 
+double weighted_distance(std::vector<double> p, std::vector<double> v){
+	if(p.size() != v.size()){
+		ROS_ERROR("Distance between states cannot be found, as states have different dimension");		
+		return -1;
+	}
+	double sum = 0.0;
+	for(int i = 0; i< p.size(); i++){
+		sum += std::pow(p[i] - v[i], 2);
+	}
+	return std::sqrt(sum); 
 }
 
 
