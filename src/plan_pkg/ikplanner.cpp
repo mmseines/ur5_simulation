@@ -153,14 +153,14 @@ int main(int argc, char **argv)
 		double pose [6];
 		getPose(line, pose);
 
-		tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);
+		//tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);
 	
-		geometry_msgs::Pose viewpoint;
+		//geometry_msgs::Pose viewpoint;
 
 		pose[0] = pose[0]/scale;
-		pose[1] = pose[1]/scale;
+		pose[1] = pose[1]/scale + 0.2;
 		pose[2] = pose[2]/scale;
-
+		/*
 		viewpoint.orientation.x = qt.x();
 		viewpoint.orientation.y = qt.y();
 		viewpoint.orientation.z = qt.z();
@@ -169,6 +169,7 @@ int main(int argc, char **argv)
 		viewpoint.position.y = (pose[1]);
 		viewpoint.position.z = (pose[2]);
 
+*/	
 		//getTransform(pose,tf_matrix); //Own solution... 
 
 		Eigen::Affine3d r = create_rotation_matrix(pose[3], pose[4], pose[5]);
@@ -194,14 +195,14 @@ int main(int argc, char **argv)
 			for(int q = 0; q < 6; q++){
 				if (q_ik_sols[i][q] != q_ik_sols[i][q] || !std::isfinite(q_ik_sols[i][q]) ){ //Check for nan / inf
 					break;				
-				}else if( abs(q_ik_sols[i][q]) > M_PI){
-						q_ik_sols[i][q] -= sgn(q_ik_sols[i][q])*2*M_PI; 
-						if(abs(q_ik_sols[i][q]) > M_PI){
-							//No solution							
-							break;
-						} 
+				}else if( fabs(q_ik_sols[i][q]) <= M_PI ){
+						val_sol.push_back(q_ik_sols[i][q]);
+				}else if( q_ik_sols[i][q] + 2*M_PI < M_PI || q_ik_sols[i][q] - 2*M_PI > -M_PI){
+						val_sol.push_back(q_ik_sols[i][q] - sgn(q_ik_sols[i][q])*2*M_PI);
+				}else{
+					ROS_ERROR("WUT? %0.2f", q_ik_sols[i][q]);
+					break;
 				}  
-				val_sol.push_back(q_ik_sols[i][q]);
 			}
 			if(val_sol.size() == 6){
 					valid_solutions.push_back(val_sol);
@@ -296,8 +297,6 @@ int main(int argc, char **argv)
 				
 				//And this works somehow.
 				group.execute(plan);
-				ros::Duration(1.0).sleep();
-				sleep(1.0);
 
 			}
 
@@ -381,7 +380,7 @@ double weighted_distance(std::vector<double> p, std::vector<double> v){
 	}
 	double sum = 0.0;
 	for(int i = 0; i< p.size(); i++){
-		sum += std::pow(p[i] - v[i], 2);
+		sum += std::pow(p[i] - v[i], 2)*(2/(i+1));
 	}
 	return std::sqrt(sum); 
 }
