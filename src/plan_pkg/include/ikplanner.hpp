@@ -29,7 +29,15 @@ void getPose(std::string, double*);
 */
 void getTransform(double*, double [][4]);
 
-Eigen::Affine3d create_rotation_matrix(double ax, double ay, double az);
+/*
+	functions for working with Eigen datastructures. 
+*/
+Eigen::Affine3d createRotationMatrix(double ax, double ay, double az);
+
+/*
+	Help function as inverse function from ur_kin takes a tf matrix as a double array and not en Eigen matrix. 
+*/
+void setFromMatrix(Eigen::Matrix4d, double [][4]);
 
 /*
 	standard sign function
@@ -39,7 +47,7 @@ template <typename T> int sgn(T val);
 /*
 	Weigthed distance between two vectors. 
 */
-double weighted_distance(std::vector<double> p, std::vector<double> v);
+double weightedDistance(std::vector<double> p, std::vector<double> v);
 
 
 #endif

@@ -112,6 +112,7 @@ find_package(catkin REQUIRED COMPONENTS
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+	plan_pkg/include
 )
 
 ## Declare a cpp library
@@ -139,7 +140,6 @@ target_link_libraries(sim
 )
 target_link_libraries(ikSim
   ${catkin_LIBRARIES} 
-	
 )
 
 

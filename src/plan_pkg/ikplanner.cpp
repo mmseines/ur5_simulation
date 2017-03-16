@@ -120,7 +120,6 @@ int main(int argc, char **argv)
 /* Specify bounds on the workspace */
 
 	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
-
 	req.workspace_parameters.min_corner.z = -0.05;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.7;
 	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y = req.workspace_parameters.max_corner.z =  0.7;
@@ -139,8 +138,6 @@ int main(int argc, char **argv)
 	
 	double tf_matrix[4][4];
 
-	//KDL::Frame kdl_pose;
-
 	std::vector<double> curr_joint_states;
 
 	while(std::getline(f, line))
@@ -153,13 +150,12 @@ int main(int argc, char **argv)
 		double pose [6];
 		getPose(line, pose);
 
-		//tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);
-	
+		pose[0] = pose[0]/scale - 0.1;
+		pose[1] = pose[1]/scale + 0.15;
+		pose[2] = pose[2]/scale + 0.1;
+		
+		//tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);	
 		//geometry_msgs::Pose viewpoint;
-
-		pose[0] = pose[0]/scale;
-		pose[1] = pose[1]/scale + 0.2;
-		pose[2] = pose[2]/scale;
 		/*
 		viewpoint.orientation.x = qt.x();
 		viewpoint.orientation.y = qt.y();
@@ -168,21 +164,15 @@ int main(int argc, char **argv)
 		viewpoint.position.x = (pose[0])+ 0.2; // Testing with a non ideal path. 
 		viewpoint.position.y = (pose[1]);
 		viewpoint.position.z = (pose[2]);
-
 */	
 		//getTransform(pose,tf_matrix); //Own solution... 
 
-		Eigen::Affine3d r = create_rotation_matrix(pose[3], pose[4], pose[5]);
+		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
   	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
 		
 		Eigen::Matrix4d m = (t * r).matrix();	
-	
-		for(int n = 0; n < 4; n++){
-			for(int q = 0; q < 4; q++){
-				tf_matrix[n][q] = m(n, q);
-			}
-		}
 
+		setFromMatrix(m, tf_matrix);
 
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
@@ -230,11 +220,13 @@ int main(int argc, char **argv)
 
 			joint_values.clear();			
 			//Get the current joint state. 
-			double min_distance = FLT_MAX;			
+			double min_distance = FLT_MAX;
+			int solution_choice = -1;			
 			for(int i = 0; i < valid_solutions.size(); i++) {
-				double dis = weighted_distance(curr_joint_states, valid_solutions[i]);
+				double dis = weightedDistance(curr_joint_states, valid_solutions[i]);
 				if( dis < min_distance){
 					joint_values = valid_solutions[i];
+					solution_choice = i;
 				}
 			}
 				
@@ -264,7 +256,7 @@ int main(int argc, char **argv)
 			/* Call the Planner */
 			planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
   		context->solve(res);
-  		/* Check that the planning was successful */
+
   		if(res.error_code_.val != res.error_code_.SUCCESS)
   		{
    			ROS_ERROR("Could not compute plan successfully... printing goal");
@@ -272,14 +264,10 @@ int main(int argc, char **argv)
 				{
     			ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
   			}
-		
 				//return 0;
-				count++; 
-				continue;
 			}else{
-				/*
-					Apparantly the planning was sucessfull. 								
-				*/
+			
+				//Success 
 				res.getMessage(response);				
 				moveit::planning_interface::MoveGroup::Plan plan;
 				moveit_msgs::RobotTrajectory trajectory = response.trajectory;
@@ -358,7 +346,7 @@ void getTransform(double * pose, double tf[][4]){
 }
 
 //Stolen from stackoverflow...
-Eigen::Affine3d create_rotation_matrix(double ax, double ay, double az){
+Eigen::Affine3d createRotationMatrix(double ax, double ay, double az){
 	Eigen::Affine3d rx =
       Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
   Eigen::Affine3d ry =
@@ -372,8 +360,8 @@ template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
-//TODO: implement some meaningful weights to this. 
-double weighted_distance(std::vector<double> p, std::vector<double> v){
+//Simple weighted sum. 
+double weightedDistance(std::vector<double> p, std::vector<double> v){
 	if(p.size() != v.size()){
 		ROS_ERROR("Distance between states cannot be found, as states have different dimension");		
 		return -1;
@@ -383,6 +371,15 @@ double weighted_distance(std::vector<double> p, std::vector<double> v){
 		sum += std::pow(p[i] - v[i], 2)*(2/(i+1));
 	}
 	return std::sqrt(sum); 
+}
+
+void setFromMatrix(Eigen::Matrix4d m, double tf[][4]){
+	for(int n = 0; n < 4; n++){
+			for(int q = 0; q < 4; q++){
+				tf[n][q] = m(n, q);
+			}
+	}
+	return;
 }
 
 
