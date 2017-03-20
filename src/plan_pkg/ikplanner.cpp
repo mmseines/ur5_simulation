@@ -126,7 +126,7 @@ int main(int argc, char **argv)
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/detailedPath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/xtionPath.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -150,9 +150,9 @@ int main(int argc, char **argv)
 		double pose [6];
 		getPose(line, pose);
 
-		pose[0] = pose[0]/scale - 0.1;
-		pose[1] = pose[1]/scale + 0.15;
-		pose[2] = pose[2]/scale + 0.1;
+		pose[0] = pose[0]/scale -0.1;
+		pose[1] = pose[1]/scale;
+		pose[2] = pose[2]/scale;
 		
 		//tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);	
 		//geometry_msgs::Pose viewpoint;
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
 			val_sol.clear();  				
 		}
 		
-		ROS_INFO("Inverse kinematics gave: %i, solutions where %i where valid", num_sols, (int) valid_solutions.size()); 
+		ROS_INFO("Inverse kinematics gave: %i, solutsions where %i where valid", num_sols, (int) valid_solutions.size()); 
 		
 		//bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
 		
