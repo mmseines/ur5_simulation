@@ -140,7 +140,7 @@ int main(int argc, char **argv)
 
 	std::vector<double> curr_joint_states;
 
-	while(std::getline(f, line))
+	while(std::getline(f, line) && ros::ok())
 	{	
 		/*
 			IDEA: Rewrite this to operate on start position and goal position. 
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 					break;
 				}  
 			}
-			if(val_sol.size() == 6){
+			if(val_sol.size() == 6 && (val_sol[1] > -3.1 && val_sol[1]< 0.1)){
 					valid_solutions.push_back(val_sol);
 			}
 			val_sol.clear();  				

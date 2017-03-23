@@ -128,6 +128,9 @@ add_executable(ikSim
 	ikplanner.cpp
 	ur_kin.cpp
 )
+add_executable(tSim
+	trac_planner.cpp
+)
 
 
 ## Add cmake target dependencies of the executable/library
