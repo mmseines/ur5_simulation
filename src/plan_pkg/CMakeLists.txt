@@ -21,6 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
 	moveit_ros_planning_interface
 	moveit_ros_robot_interaction
 	pluginlib
+	trac-ik
 )
 
 ## System dependencies are found with CMake's conventions
@@ -144,5 +145,9 @@ target_link_libraries(sim
 target_link_libraries(ikSim
   ${catkin_LIBRARIES} 
 )
+target_link_libraries(tSim
+  ${catkin_LIBRARIES} 
+)
+
 
 
