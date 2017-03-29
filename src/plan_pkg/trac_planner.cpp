@@ -39,7 +39,7 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
   bool valid = tracik_solver.getKDLChain(chain);
   
   if (!valid) {
-    ROS_ERROR("There was no valid KDL chain found");
+    ROS_ERROR("There was no valid KDL cdhain fousssnd");
     return;
   }
 

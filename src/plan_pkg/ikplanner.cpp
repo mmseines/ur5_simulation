@@ -4,6 +4,7 @@
 //Header
 
 #include "include/ikplanner.hpp"
+#include "include/trac_planner.hpp"
 
 // ROS message types.
 #include <geometry_msgs/Pose.h>
@@ -40,16 +41,18 @@
 #include <tf_conversions/tf_kdl.h>
 #include <ur_kinematics/ur_kin.h>
 
+
 //Action lib
 //#include <actionlib/client/simple_action_client.h>
 
 
+/*
+		Main function
+*/
 int main(int argc, char **argv)
 {
-/*
-	Setup rosnode and spinner.
-*/
-	ros::init(argc, argv, "path_sim");
+
+	ros::init(argc, argv, "path_sism");
 	ros::NodeHandle n;	
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
@@ -104,6 +107,13 @@ int main(int argc, char **argv)
                      << "Available plugins: " << ss.str());
 	}
 
+	std::vector< std::string> algs;
+	planner_instance->getPlanningAlgorithms(algs);
+	std::stringstream stinger;
+	for(int i = 0; i < algs.size(); i++){
+		stinger << algs[i] << "\n";
+	}
+	ROS_INFO_STREAM("algorithms: " << stinger.str() << "....");
 /* ----------------- End planner loader --------*/
 
 	/* Moveit group interface for actually moving the robot */	
@@ -115,6 +125,7 @@ int main(int argc, char **argv)
 
 	planning_interface::MotionPlanRequest req;
 	req.group_name = "manipulator";
+	req.planner_id = "manipulator";
 	planning_interface::MotionPlanResponse res;
 	moveit_msgs::MotionPlanResponse response;
 /* Specify bounds on the workspace */
@@ -126,7 +137,7 @@ int main(int argc, char **argv)
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/xtionPath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/obstaclePath.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -142,6 +153,9 @@ int main(int argc, char **argv)
 
 	while(std::getline(f, line) && ros::ok())
 	{	
+		if(!std::getline(f,line)){
+			break;
+		}
 		/*
 			IDEA: Rewrite this to operate on start position and goal position. 
 						- Test if that makes anything more simple. 
@@ -150,7 +164,7 @@ int main(int argc, char **argv)
 		double pose [6];
 		getPose(line, pose);
 
-		pose[0] = pose[0]/scale -0.1;
+		pose[0] = pose[0]/scale;
 		pose[1] = pose[1]/scale;
 		pose[2] = pose[2]/scale;
 		
@@ -185,6 +199,8 @@ int main(int argc, char **argv)
 			for(int q = 0; q < 6; q++){
 				if (q_ik_sols[i][q] != q_ik_sols[i][q] || !std::isfinite(q_ik_sols[i][q]) ){ //Check for nan / inf
 					break;				
+				}else if(i == 5){
+						//do nothing.
 				}else if( fabs(q_ik_sols[i][q]) <= M_PI ){
 						val_sol.push_back(q_ik_sols[i][q]);
 				}else if( q_ik_sols[i][q] + 2*M_PI < M_PI || q_ik_sols[i][q] - 2*M_PI > -M_PI){
@@ -212,24 +228,60 @@ int main(int argc, char **argv)
 		if (valid_solutions.size() != 0)
 		{
 			
-			planning_scene->setCurrentState(*group.getCurrentState());
+			
 
 			//semi temp fix to get current state. 
 			moveit::core::RobotState blah = *group.getCurrentState();
 			blah.copyJointGroupPositions(joint_model_group, curr_joint_states);
+			planning_scene->setCurrentState(*group.getCurrentState());			
+
+			collision_detection::CollisionRequest c_req;
+			c_req.contacts = 1;
+			collision_detection::CollisionResult c_res;			
 
 			joint_values.clear();			
 			//Get the current joint state. 
 			double min_distance = FLT_MAX;
-			int solution_choice = -1;			
+			//int solution_choice = -1;
+			bool collision = 0;			
 			for(int i = 0; i < valid_solutions.size(); i++) {
-				double dis = weightedDistance(curr_joint_states, valid_solutions[i]);
-				if( dis < min_distance){
+				double dis = weightedDistance(curr_joint_states, valid_solutions[i]);									
+				
+				if( dis < min_distance || collision){
+
+	// Trying to compute self collision to get more suitable configuration. 
+					std::vector<double> interpolated_state;
+					interpolated_state.clear();
+					interpolated_state.push_back( curr_joint_states[0]*(0.5) + valid_solutions[i][0]*(0.5) );
+					interpolated_state.push_back( curr_joint_states[1]*(0.5) + valid_solutions[i][1]*(0.5) );
+					interpolated_state.push_back( curr_joint_states[2]*(0.5) + valid_solutions[i][2]*(0.5) );
+					interpolated_state.push_back( curr_joint_states[3]*(0.5) + valid_solutions[i][3]*(0.5) );
+					interpolated_state.push_back( curr_joint_states[4]*(0.5) + valid_solutions[i][4]*(0.5) );
+					interpolated_state.push_back( curr_joint_states[5]*(0.5) + valid_solutions[i][5]*(0.5) );
+
+ 
+					blah.setJointGroupPositions(joint_model_group, interpolated_state);
+					//planning_scene->setCurrentState(blah);
+					planning_scene->checkSelfCollision(c_req,c_res, blah);	
+				
+					//solution_choice = i;
+					if(c_res.collision){
+						collision = 1;
+					}else{
+						collision = 0;
+					}
+
+					min_distance = dis;			
 					joint_values = valid_solutions[i];
-					solution_choice = i;
+					
 				}
 			}
-				
+
+			if(collision){
+				ROS_INFO("Solution will have self collision if simply interpolated");
+			}
+			
+			//planning_scene->setCurrentState(*group.getCurrentState());
   		//kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
 			/*
 			joint_values.clear();
@@ -251,7 +303,7 @@ int main(int argc, char **argv)
 			goal_state.setJointGroupPositions(joint_model_group, joint_values);
   		moveit_msgs::Constraints joint_goal = kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group, tolerance_below, tolerance_above);
   		req.goal_constraints.clear();
-			req.goal_constraints.push_back(joint_goal);		
+			req.goal_constraints.push_back(joint_goal);				
 
 			/* Call the Planner */
 			planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
@@ -361,14 +413,14 @@ template <typename T> int sgn(T val) {
 }
 
 //Simple weighted sum. 
-double weightedDistance(std::vector<double> p, std::vector<double> v){
+double weightedDistance(std::vector<double> p, std::vector<double> v, std::vector<double> w){
 	if(p.size() != v.size()){
 		ROS_ERROR("Distance between states cannot be found, as states have different dimension");		
 		return -1;
 	}
 	double sum = 0.0;
 	for(int i = 0; i< p.size(); i++){
-		sum += std::pow(p[i] - v[i], 2)*(2/(i+1));
+		sum += std::pow(p[i] - v[i], 2)*w[i]);
 	}
 	return std::sqrt(sum); 
 }

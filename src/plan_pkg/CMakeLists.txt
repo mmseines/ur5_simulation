@@ -122,15 +122,11 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-add_executable(sim 
-	planner.cpp	
-)
+add_executable(sim planner.cpp)
+add_executable(tSim trac_planner.cpp)
 add_executable(ikSim 
 	ikplanner.cpp
 	ur_kin.cpp
-)
-add_executable(tSim
-	trac_planner.cpp
 )
 
 
@@ -142,12 +138,13 @@ add_executable(tSim
 target_link_libraries(sim
   ${catkin_LIBRARIES} 
 )
-target_link_libraries(ikSim
-  ${catkin_LIBRARIES} 
-)
 target_link_libraries(tSim
   ${catkin_LIBRARIES} 
 )
+target_link_libraries(ikSim
+  ${catkin_LIBRARIES} 
+)
+
 
 
 

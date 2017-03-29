@@ -47,7 +47,12 @@ template <typename T> int sgn(T val);
 /*
 	Weigthed distance between two vectors. 
 */
-double weightedDistance(std::vector<double> p, std::vector<double> v);
+double weightedDistance(std::vector<double> p, std::vector<double> v, std::vector<double> w);
+
+/*
+ 
+*/
+int check_collision(std::vector<double> p, std::vector<double> v);
 
 
 #endif
