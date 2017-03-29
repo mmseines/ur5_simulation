@@ -190,6 +190,7 @@ int main(int argc, char **argv)
 
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
+		double weights[6] = {8.0, 1.0, 1.0 ,1.0, 1.0, 1.0};
 
 		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f); //Last variable defaults to 0.0f, but is added to remember that it is there. 
 		
@@ -245,7 +246,7 @@ int main(int argc, char **argv)
 			//int solution_choice = -1;
 			bool collision = 0;			
 			for(int i = 0; i < valid_solutions.size(); i++) {
-				double dis = weightedDistance(curr_joint_states, valid_solutions[i]);									
+				double dis = weightedDistance(curr_joint_states, valid_solutions[i], weights);									
 				
 				if( dis < min_distance || collision){
 
@@ -413,14 +414,14 @@ template <typename T> int sgn(T val) {
 }
 
 //Simple weighted sum. 
-double weightedDistance(std::vector<double> p, std::vector<double> v, std::vector<double> w){
+double weightedDistance(std::vector<double> p, std::vector<double> v, double w[6]){
 	if(p.size() != v.size()){
 		ROS_ERROR("Distance between states cannot be found, as states have different dimension");		
 		return -1;
 	}
 	double sum = 0.0;
 	for(int i = 0; i< p.size(); i++){
-		sum += std::pow(p[i] - v[i], 2)*w[i]);
+		sum += std::pow(p[i] - v[i], 2)*w[i];
 	}
 	return std::sqrt(sum); 
 }
