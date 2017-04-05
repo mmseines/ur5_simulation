@@ -57,6 +57,7 @@ int main(int argc, char **argv)
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
 
+
 /*
 	Load urdf, setup joint model groups and kinematic state. 
 */
@@ -65,21 +66,15 @@ int main(int argc, char **argv)
 	robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
 	ROS_INFO("Model frame: %s", robot_model->getModelFrame().c_str());
 	planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model));
-	
 	robot_state::RobotStatePtr kinematic_state(new robot_state::RobotState(robot_model));
 	kinematic_state->setToDefaultValues();
+
 
  	//Get joint model names and group values
 	const robot_state::JointModelGroup * joint_model_group = robot_model->getJointModelGroup("manipulator");
 	const std::vector<std::string>  joint_names = joint_model_group->getJointModelNames();
+	
 	std::vector<double> joint_values;	
-	kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
-
-	ROS_INFO("Robot joint group loaded... names of joints are as follows:"); 
-	for(std::size_t i = 0; i < joint_names.size(); ++i)
-	{
-  	ROS_INFO("Joint %s", joint_names[i].c_str());
-	}	
 
 
 /* -----------------------------Loading planner --------------------- (necessary for constraint based pose goal planning.) */
@@ -110,20 +105,19 @@ int main(int argc, char **argv)
 
 	std::vector< std::string> algs;
 	planner_instance->getPlanningAlgorithms(algs);
-	std::stringstream stinger;
-	for(int i = 0; i < algs.size(); i++){
-		stinger << algs[i] << "\n";
-	}
-	ROS_INFO_STREAM("algorithms: " << stinger.str() << "....");
+	//std::stringstream sstr;
+	//for(int i = 0; i < algs.size(); i++){
+	//	sstr << algs[i] << "\n";
+	//}
+	//ROS_INFO_STREAM("algorithms: " << stinger.str() << "....");
 /* ----------------- End planner loader --------*/
 
-	/* Moveit group interface for actually moving the robot */	
+	
+
+/* Moveit group interface for actually moving the robot */	
 	moveit::planning_interface::MoveGroup group("manipulator");
 
-	/* Specify tolerance and declare request and response */
-	double tolerance_below = 1e-3;
-	double tolerance_above = 1e-3;	
-
+	/* Specify tolerance and declare request and response */	
 	planning_interface::MotionPlanRequest req;
 	req.group_name = "manipulator";
 	req.planner_id = "manipulator";
@@ -131,6 +125,8 @@ int main(int argc, char **argv)
 	moveit_msgs::MotionPlanResponse response;
 /* Specify bounds on the workspace */
 
+	double tolerance_below = 1e-3;
+	double tolerance_above = 1e-3;
 	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
 	req.workspace_parameters.min_corner.z = -0.05;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.7;
@@ -171,17 +167,6 @@ int main(int argc, char **argv)
 		pose[1] = pose[1]/scale;
 		pose[2] = pose[2]/scale;
 		
-		//tf::Quaternion qt = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);	
-		//geometry_msgs::Pose viewpoint;
-		/*
-		viewpoint.orientation.x = qt.x();
-		viewpoint.orientation.y = qt.y();
-		viewpoint.orientation.z = qt.z();
-		viewpoint.orientation.w = qt.w();
-		viewpoint.position.x = (pose[0])+ 0.2; // Testing with a non ideal path. 
-		viewpoint.position.y = (pose[1]);
-		viewpoint.position.z = (pose[2]);
-*/	
 		//getTransform(pose,tf_matrix); //Own solution... 
 
 		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
@@ -228,9 +213,6 @@ int main(int argc, char **argv)
 
 		if (valid_solutions.size() != 0)
 		{
-			
-			
-
 			//semi temp fix to get current state. 
 			moveit::core::RobotState blah = *group.getCurrentState();
 			blah.copyJointGroupPositions(joint_model_group, curr_joint_states);
