@@ -2,8 +2,9 @@
 #include <trac_ik/trac_ik.hpp>
 #include <ros/ros.h>
 #include <kdl/chainiksolverpos_nr_jl.hpp>
-#include "kdl_conversions/kdl_msg.h"
+#include <kdl_conversions/kdl_msg.h>
 #include <geometry_msgs/Pose.h>
+
 
 double fRand(double min, double max)
 {
@@ -21,7 +22,7 @@ KDL::Frame vectorToFrame(std::vector<double> v)
 
 }
 */
-void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::string chain_end, double timeout, std::string urdf_param, std::vector<geometry_msgs::Pose> &tour, const std::vector<KDL::JntArray> & ik_solutions)
+void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::string chain_end, double timeout, std::string urdf_param, std::vector<geometry_msgs::Pose> tour, std::vector<KDL::JntArray>  ik_solutions)
 {
 
   double eps = 1e-5;
@@ -83,8 +84,13 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
 
 	std::vector<KDL::Frame> viewpoints;
 	for (uint i=0; i < tour.size(); i++) {
-		tf::poseMsgToKDL(tour[i], &end_effector_pose); 
-		viewpoints.pushback(end_effector_pose);
+		geometry_msgs::Pose woppa = tour[i];
+		
+		//DEPRECIATED: TODO make alternative. 		
+		tf::poseMsgToKDL(woppa, end_effector_pose); 
+
+
+		viewpoints.push_back(end_effector_pose);
   }
 
   int rc;
@@ -123,6 +129,9 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "ik_tests");
   ros::NodeHandle nh("~");
 
+	ros::AsyncSpinner spinner(1);
+	spinner.start();
+
   int num_samples;
   std::string chain_start, chain_end, urdf_param;
   double timeout;
@@ -157,7 +166,7 @@ int main(int argc, char** argv)
 	tour.push_back(p);
 
 
-  tourToJointPosition(nh, chain_start, chain_end, timeout, urdf_param, &tour, &sol);
+  tourToJointPosition(nh, chain_start, chain_end, timeout, urdf_param, tour, sol);
 
   // Useful when you make a script that loops over multiple launch files that test different robot chains
   // std::vector<char *> commandVector;

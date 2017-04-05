@@ -16,12 +16,11 @@ find_package(catkin REQUIRED COMPONENTS
   shape_msgs
   message_generation
 	moveit_ros_move_group
-	moveit_core
 	moveit_ros_planning
 	moveit_ros_planning_interface
 	moveit_ros_robot_interaction
 	pluginlib
-	trac-ik
+	trac_ik_lib
 )
 
 ## System dependencies are found with CMake's conventions

@@ -3,8 +3,8 @@
 */
 //Header
 
-#include "include/ikplanner.hpp"
-#include "include/trac_planner.hpp"
+#include "ikplanner.hpp"
+#include "trac_planner.hpp"
 
 // ROS message types.
 #include <geometry_msgs/Pose.h>
@@ -60,8 +60,9 @@ int main(int argc, char **argv)
 /*
 	Load urdf, setup joint model groups and kinematic state. 
 */
+
 	robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-  robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
+	robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
 	ROS_INFO("Model frame: %s", robot_model->getModelFrame().c_str());
 	planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model));
 	
@@ -137,7 +138,7 @@ int main(int argc, char **argv)
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/obstaclePath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -153,7 +154,9 @@ int main(int argc, char **argv)
 
 	while(std::getline(f, line) && ros::ok())
 	{	
+		count++;
 		if(!std::getline(f,line)){
+			count++;
 			break;
 		}
 		/*
@@ -183,18 +186,15 @@ int main(int argc, char **argv)
 
 		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
   	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
-		
 		Eigen::Matrix4d m = (t * r).matrix();	
-
 		setFromMatrix(m, tf_matrix);
 
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
 		double weights[6] = {8.0, 1.0, 1.0 ,1.0, 1.0, 1.0};
 
-		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f); //Last variable defaults to 0.0f, but is added to remember that it is there. 
-		
-//Need to check validity of theese solutions though...
+		//Compute inverse kinematics and check them to be within joint limits -pi to pi
+		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f);  
 		for(int i = 0; i < num_sols; i++){
 			std::vector<double> val_sol;
 			for(int q = 0; q < 6; q++){
@@ -204,14 +204,14 @@ int main(int argc, char **argv)
 						//do nothing.
 				}else if( fabs(q_ik_sols[i][q]) <= M_PI ){
 						val_sol.push_back(q_ik_sols[i][q]);
-				}else if( q_ik_sols[i][q] + 2*M_PI < M_PI || q_ik_sols[i][q] - 2*M_PI > -M_PI){
+				}else if( q_ik_sols[i][q] + 2*M_PI <= M_PI || q_ik_sols[i][q] - 2*M_PI >= -M_PI){
 						val_sol.push_back(q_ik_sols[i][q] - sgn(q_ik_sols[i][q])*2*M_PI);
 				}else{
 					ROS_ERROR("WUT? %0.2f", q_ik_sols[i][q]);
 					break;
 				}  
 			}
-			if(val_sol.size() == 6 && (val_sol[1] > -3.1 && val_sol[1]< 0.1)){
+			if(val_sol.size() == 6 && (val_sol[1] > -3.1 && val_sol[1]< 0.04)){ // could be stricter, avoiding configurations where the lift joint is bent downward.
 					valid_solutions.push_back(val_sol);
 			}
 			val_sol.clear();  				
@@ -237,66 +237,30 @@ int main(int argc, char **argv)
 			planning_scene->setCurrentState(*group.getCurrentState());			
 
 			collision_detection::CollisionRequest c_req;
-			c_req.contacts = 1;
+			c_req.contacts = 1;  // check for self collision via contact. 
 			collision_detection::CollisionResult c_res;			
+			joint_values.clear();			//Incase there are no solutions without self collision.
 
-			joint_values.clear();			
-			//Get the current joint state. 
-			double min_distance = FLT_MAX;
-			//int solution_choice = -1;
-			bool collision = 0;			
+			double min_distance = FLT_MAX;		
 			for(int i = 0; i < valid_solutions.size(); i++) {
 				double dis = weightedDistance(curr_joint_states, valid_solutions[i], weights);									
 				
-				if( dis < min_distance || collision){
-
-	// Trying to compute self collision to get more suitable configuration. 
-					std::vector<double> interpolated_state;
-					interpolated_state.clear();
-					interpolated_state.push_back( curr_joint_states[0]*(0.5) + valid_solutions[i][0]*(0.5) );
-					interpolated_state.push_back( curr_joint_states[1]*(0.5) + valid_solutions[i][1]*(0.5) );
-					interpolated_state.push_back( curr_joint_states[2]*(0.5) + valid_solutions[i][2]*(0.5) );
-					interpolated_state.push_back( curr_joint_states[3]*(0.5) + valid_solutions[i][3]*(0.5) );
-					interpolated_state.push_back( curr_joint_states[4]*(0.5) + valid_solutions[i][4]*(0.5) );
-					interpolated_state.push_back( curr_joint_states[5]*(0.5) + valid_solutions[i][5]*(0.5) );
-
- 
-					blah.setJointGroupPositions(joint_model_group, interpolated_state);
+				if( dis < min_distance){
+					blah.setJointGroupPositions(joint_model_group, valid_solutions[i]);
 					//planning_scene->setCurrentState(blah);
-					planning_scene->checkSelfCollision(c_req,c_res, blah);	
-				
-					//solution_choice = i;
-					if(c_res.collision){
-						collision = 1;
-					}else{
-						collision = 0;
-					}
-
-					min_distance = dis;			
-					joint_values = valid_solutions[i];
-					
-				}
-			}
-
-			if(collision){
-				ROS_INFO("Solution will have self collision if simply interpolated");
-			}
+					planning_scene->checkSelfCollision(c_req, c_res, blah);	
 			
-			//planning_scene->setCurrentState(*group.getCurrentState());
-  		//kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
-			/*
-			joint_values.clear();
-			for(int i = 0; i < valid_solutions.size(); i++){
-				if(valid_solutions[i][2] > 0.0){
-					joint_values.clear();
-					joint_values = valid_solutions[i];
-					break;
+					if(!c_res.collision){
+						min_distance = dis;			
+						joint_values = valid_solutions[i];
+					}
 				}
 			}
-*/ 
+
+			
 			if(joint_values.size() != 6){
-				ROS_ERROR("Error selecting IK solution: %i", count);
-				break;
+				ROS_ERROR("Error selecting IK solution: %i, size of joint state vector = %zu, number of assumed valid solutions: %zu", count, joint_values.size(), valid_solutions.size());
+				continue;
 			}
 
 			//Define goals etc.
@@ -312,11 +276,8 @@ int main(int argc, char **argv)
 
   		if(res.error_code_.val != res.error_code_.SUCCESS)
   		{
-   			ROS_ERROR("Could not compute plan successfully... printing goal");
-				for(std::size_t i=0; i < joint_names.size(); ++i)
-				{
-    			ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
-  			}
+   			ROS_ERROR("Could not compute plan sucsessfully for wp: %i", count );
+					
 				//return 0;
 			}else{
 			
@@ -342,10 +303,10 @@ int main(int argc, char **argv)
 			}
 
 
-			count++;
+			
 		}else{
   		ROS_ERROR("Did not find IK solution for viewpoint %i", count);
-			count++;		
+				
 		}
 		
 		
