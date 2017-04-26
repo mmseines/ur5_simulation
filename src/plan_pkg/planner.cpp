@@ -1,4 +1,245 @@
+/*
+	Using dense planner from ros descartes to make optimal trajectory.
 
+*/
+
+// Core ros functionality like ros::init and spin
+#include <ros/ros.h>
+// ROS Trajectory Action server definition
+#include <control_msgs/FollowJointTrajectoryAction.h>
+// Means by which we communicate with above action-server
+#include <actionlib/client/simple_action_client.h>
+ 
+// Includes the descartes robot model we will be using
+#include <descartes_moveit/moveit_state_adapter.h>
+// Includes the descartes trajectory type we will be using
+#include <descartes_trajectory/axial_symmetric_pt.h>
+#include <descartes_trajectory/cart_trajectory_pt.h>
+// Includes the planner we will be using
+ #include <descartes_planner/dense_planner.h>
+
+//file operations:
+#include<fstream>
+#include<string>
+#include <cstdlib>
+
+typedef std::vector<descartes_core::TrajectoryPtPtr> TrajectoryVec;
+typedef TrajectoryVec::const_iterator TrajectoryIter;
+
+
+void getPose(std::string s, double* v){
+	int p = 0;
+	int q = 0;
+	for(int i = 0; i< s.size(); i++){
+		if(s[i] == ',' || i == s.size() -1){
+			char tab2[16];
+			strcpy(tab2, s.substr(p,i-p).c_str());
+			v[q] = std::strtod(tab2, NULL);
+			p = i+1;
+			q++; 
+		}
+	}
+	return;
+}
+
+//Creation of rotation matrix
+Eigen::Affine3d create_rotation_matrix(double ax, double ay, double az) {
+  Eigen::Affine3d rx =
+      Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
+  Eigen::Affine3d ry =
+      Eigen::Affine3d(Eigen::AngleAxisd(ay, Eigen::Vector3d(0, 1, 0)));
+  Eigen::Affine3d rz =
+      Eigen::Affine3d(Eigen::AngleAxisd(az, Eigen::Vector3d(0, 0, 1)));
+  return rz * ry * rx;
+}
+
+
+// function returning TolerancedFrame
+Eigen::Affine3d makeRotMatrix(double * pose)
+{
+	Eigen::Affine3d rot = create_rotation_matrix(pose[3], pose[4], pose[5]);
+	Eigen::Affine3d t(Eigen::Translation3d(pose[0], pose[1], pose[3]));
+	Eigen::Matrix4d m = (rot * t).matrix();
+	Eigen::Affine3d frame(m);
+	return frame;
+}
+
+trajectory_msgs::JointTrajectory toROSJointTrajectory(const TrajectoryVec& trajectory,
+                         const descartes_core::RobotModel& model,
+                         const std::vector<std::string>& joint_names,
+                         double time_delay)
+{
+// Fill out information about our trajectory
+	trajectory_msgs::JointTrajectory result;
+	result.header.stamp = ros::Time::now();
+	result.header.frame_id = "world_frame";
+	result.joint_names = joint_names;
+	// For keeping track of time-so-far in the trajectory
+	double time_offset = 0.0;
+	// Loop through the trajectory
+	for (TrajectoryIter it = trajectory.begin(); it != trajectory.end(); ++it)
+	{
+		// Find nominal joint solution at this point
+		std::vector<double> joints;
+		it->get()->getNominalJointPose(std::vector<double>(), model, joints);
+	 
+	// Fill out a ROS trajectory point
+		trajectory_msgs::JointTrajectoryPoint pt;
+		pt.positions = joints;
+		// velocity, acceleration, and effort are given dummy values
+	// we'll let the controller figure them out
+		pt.velocities.resize(joints.size(), 0.0);
+		pt.accelerations.resize(joints.size(), 0.0);
+		pt.effort.resize(joints.size(), 0.0);
+		 // set the time into the trajectory
+		pt.time_from_start = ros::Duration(time_offset);
+		// increment time
+		time_offset += time_delay;
+
+		result.points.push_back(pt);
+	}
+		
+	return result;
+}
+
+descartes_core::TrajectoryPtPtr makeCartesianPoint(const Eigen::Affine3d& pose)
+{
+  using namespace descartes_core;
+  using namespace descartes_trajectory;
+
+  return TrajectoryPtPtr( new CartTrajectoryPt( TolerancedFrame(pose)) );
+}
+
+descartes_core::TrajectoryPtPtr makeTolerancedCartesianPoint(const Eigen::Affine3d& pose)
+{
+  using namespace descartes_core;
+  using namespace descartes_trajectory;
+  return TrajectoryPtPtr( new AxialSymmetricPt(pose, M_PI/2.0-0.0001, AxialSymmetricPt::Z_AXIS) );
+}
+
+
+
+bool excecuteTrajectory(const trajectory_msgs::JointTrajectory& trajectory)
+{
+  // Create a Follow Joint Trajectory Action Client
+  actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> ac("joint_trajectory_action", true);
+  if (!ac.waitForServer(ros::Duration(2.0)))
+  {
+    ROS_ERROR("Could not connect to action server");
+    return false;
+  }
+
+  control_msgs::FollowJointTrajectoryGoal goal;
+  goal.trajectory = trajectory;
+  goal.goal_time_tolerance = ros::Duration(1.0);
+  
+  ac.sendGoal(goal);
+
+  if (ac.waitForResult(goal.trajectory.points[goal.trajectory.points.size()-1].time_from_start + ros::Duration(5)))
+  {
+    ROS_INFO("Action server reported successful execution");
+    return true;
+  } else {
+    ROS_WARN("Action server could not execute trajectory");
+    return false;
+  }
+}
+
+
+int main(int argc, char** argv)
+{
+	ros::init(argc, argv, "descartes_planner");
+  ros::NodeHandle nh;
+  ros::AsyncSpinner spinner (1);
+  spinner.start();
+
+
+	TrajectoryVec points; 
+	/*
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/obstaclePath.csv");
+	std::string line;
+	double pose[6];
+	while(std::getline(f, line))
+	{
+		getPose(line, pose);
+		Eigen::Affine3d wobj_pt = makeRotMatrix(pose);
+		//Eigen::Affine3d position = Eigen::Translation3d(pose[0], pose[1], pose[3]);	
+
+	
+		descartes_core::TrajectoryPtPtr pt = makeCartesianPoint(wobj_pt);
+
+		points.push_back(pt);
+	}
+
+	/*
+			load points from file.
+	*/
+
+ for (unsigned int i = 0; i < 10; ++i)
+  {
+    Eigen::Affine3d pose;
+    pose = Eigen::Translation3d(0.370 - 0.05 * i, -0.450, 0.675);
+    descartes_core::TrajectoryPtPtr pt = makeTolerancedCartesianPoint(pose);
+    points.push_back(pt);
+  }
+
+
+	descartes_core::RobotModelPtr model (new descartes_moveit::MoveitStateAdapter);
+	
+	const std::string robot_description = "robot_description";
+	const std::string group_name = "manipulator";
+	const std::string world_frame = "world";
+	const std::string tcp_frame = "ee_link";
+
+	if (!model->initialize(robot_description, group_name, world_frame, tcp_frame))
+  {
+  	ROS_INFO("Could not initialize robot model");
+  	return -1;
+  }
+	
+	descartes_planner::DensePlanner planner;
+  planner.initialize(model);
+
+
+	if(!planner.planPath(points) )
+	{
+		ROS_ERROR("Could not solve for a valid path");
+ 		return -2;
+	}
+
+	TrajectoryVec result;
+	if (!planner.getPath(result))
+	{
+		ROS_ERROR("Could not retrieve path");
+		return -3;
+ 	}
+
+	std::vector<std::string> names;
+	nh.getParam("controller_joint_names", names);
+	
+	trajectory_msgs::JointTrajectory joint_solution = toROSJointTrajectory(result, *model, names, 1.0);
+
+	if(!excecuteTrajectory(joint_solution))
+	{
+		ROS_ERROR("Could not excecute joint solution");
+		return -4;
+
+	}
+	
+	for(int i = 0; i < points.size(); i++)
+	{
+		//delete points[i];
+	}
+
+
+	ROS_INFO("Done!");
+	return 0;
+
+}
+
+
+
+/*
 #include<ros/ros.h>
 #include<fstream>
 #include<string>
@@ -177,12 +418,13 @@ int main(int argc, char **argv)
   		group.execute(plan);
 			sleep(0.5);
 	}
-*/
+
 	}
-	
+*/
+/*	
 return 0;
 }
-
+*/
 
 
 

@@ -97,7 +97,6 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
   boost::posix_time::time_duration diff;
 
   KDL::JntArray result;
-  KDL::Frame end_effector_pose;
 	
 
 	std::vector<KDL::Frame> viewpoints;
@@ -117,15 +116,18 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
   ROS_INFO_STREAM("*** Testing TRAC-IK with "<< tour.size()<<" viewpoints");
 
   for (uint i=0; i < tour.size(); i++) {
+		
+		KDL::Frame end_effector_pose = viewpoints[i];
     double elapsed = 0;
     start_time = boost::posix_time::microsec_clock::local_time();
-    rc=tracik_solver.CartToJnt(nominal,viewpoints[i],result); //Må kanskje stille på hvordan end effector pose brukes. 
+    rc=tracik_solver.CartToJnt(nominal,end_effector_pose,result); //Må kanskje stille på hvordan end effector pose brukes. 
     diff = boost::posix_time::microsec_clock::local_time() - start_time;
     elapsed = diff.total_nanoseconds() / 1e9;
     total_time+=elapsed;
     if (rc>=0){
       success++;
-    	ik_solutions.push_back(result);
+			KDL::JntArray tmp = result;
+    	ik_solutions.push_back(tmp);
 		}
     if (int((double)i/tour.size()*100)%10 == 0)
       ROS_INFO_STREAM_THROTTLE(1,int((i)/num_samples*100)<<"\% done");
@@ -212,7 +214,8 @@ int main(int argc, char** argv)
 	Function for moving the robot.
 
 */
-//TODO: skriv inn joint space planlegging. 
+
+// TODO : this appears to either not move or have the same solution to everything. 
 
 int moveRobot(ros::NodeHandle& nh, const std::vector<KDL::JntArray>  &ik_solutions){
 	
@@ -270,7 +273,8 @@ int moveRobot(ros::NodeHandle& nh, const std::vector<KDL::JntArray>  &ik_solutio
 	//TODO : find reason for seemingly 322 identical solutions from trac_ik. 	
 
 	for(int i = 0; i < ik_solutions.size(); i++){
-			KDL::JntArray pablo = ik_solutions[i];			
+			KDL::JntArray pablo = ik_solutions[i];
+			joint_config.clear();			
 			for(int q = 0; q<6; q++){
 				joint_config.push_back(pablo(q));
 			}	

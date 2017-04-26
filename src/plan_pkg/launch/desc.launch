@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node name="desc_planner" pkg="plan_pkg" type="sim" output="screen" />
+
+</launch>

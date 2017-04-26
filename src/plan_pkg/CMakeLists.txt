@@ -9,6 +9,10 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   roslib
   std_msgs
+	descartes_core
+  descartes_moveit
+  descartes_trajectory
+	descartes_planner
   nav_msgs
   geometry_msgs
 	trajectory_msgs
@@ -112,6 +116,7 @@ find_package(catkin REQUIRED COMPONENTS
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+	../descartes
 	include
 )
 
