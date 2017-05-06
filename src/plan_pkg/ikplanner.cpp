@@ -105,11 +105,11 @@ int main(int argc, char **argv)
 
 	std::vector< std::string> algs;
 	planner_instance->getPlanningAlgorithms(algs);
-	//std::stringstream sstr;
-	//for(int i = 0; i < algs.size(); i++){
-	//	sstr << algs[i] << "\n";
-	//}
-	//ROS_INFO_STREAM("algorithms: " << stinger.str() << "....");
+	std::stringstream sstr;
+	for(int i = 0; i < algs.size(); i++){
+		sstr << algs[i] << "\n";
+	}
+	ROS_INFO_STREAM("algorithms: " << sstr.str() << "....");
 /* ----------------- End planner loader --------*/
 
 	

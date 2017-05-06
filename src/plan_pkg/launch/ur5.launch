@@ -3,12 +3,12 @@
   <arg name="num_samples" default="1000" />
   <arg name="chain_start" default="base_link" />
   <arg name="chain_end" default="wrist_3_link" />
-  <arg name="timeout" default="0.005" />
+  <arg name="timeout" default="0.05" />
 
-  <param name="robot_description" command="$(find xacro)/xacro.py '$(find ur_description)/urdf/ur5.urdf.xacro'" />
+  <param name="robot_description" command="$(find xacro)/xacro.py '$(find ur_description)/urdf/ur5_joint_limited_robot.urdf.xacro'" />
 
 
-  <node name="trac_ik_tests" pkg="plan_pkg" type="tSim" output="screen">
+  <node name="trac_ik_test" pkg="plan_pkg" type="tSim" output="screen">
     <param name="num_samples" value="$(arg num_samples)"/>
     <param name="chain_start" value="$(arg chain_start)"/>
     <param name="chain_end" value="$(arg chain_end)"/>

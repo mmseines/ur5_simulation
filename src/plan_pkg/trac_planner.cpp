@@ -48,7 +48,7 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
   // needed KDL structures.  We then pull these out to compare against the KDL
   // IK solver.
 	ROS_INFO("this runs");
-  TRAC_IK::TRAC_IK tracik_solver(chain_start, chain_end, urdf_param, timeout, eps);
+  TRAC_IK::TRAC_IK tracik_solver(chain_start, chain_end, urdf_param, timeout, eps, TRAC_IK::Distance);
 
   KDL::Chain chain;
   KDL::JntArray ll, ul; //lower joint limits, upper joint limits
@@ -84,9 +84,17 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
   // Create Nominal chain configuration midway between all joint limits
   KDL::JntArray nominal(chain.getNrOfJoints());
 
+	nominal(0) = 0.0;
+	nominal(1) = -M_PI/2;
+	nominal(2) = 0.0;
+	nominal(3) = 0.0;
+	nominal(4) = 0.0;
+	nominal(5) = -M_PI; 	
+	/*
   for (uint j=0; j<nominal.data.size(); j++) {
     nominal(j) = (ll(j)+ul(j))/2.0;
-  }    
+  } 
+	*/   
 
   // Create desired number of valid, random joint configurations
   //std::vector<KDL::JntArray> ik_solutions;
@@ -130,7 +138,7 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
     	ik_solutions.push_back(tmp);
 		}
     if (int((double)i/tour.size()*100)%10 == 0)
-      ROS_INFO_STREAM_THROTTLE(1,int((i)/num_samples*100)<<"\% done");
+      ROS_INFO_STREAM_THROTTLE(1,int((i)/num_samples)<<"\% done");
   }
 
   ROS_INFO_STREAM("TRAC-IK found "<<success<<" solutions ("<<100.0*success/num_samples<<"\%) with an average of "<<total_time/num_samples<<" secs per sample");
