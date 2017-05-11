@@ -1,4 +1,4 @@
-#include "include/trac_planner.hpp"
+#include "trac_planner.hpp"
 
 
 
@@ -26,6 +26,11 @@ void getPose(std::string s, double* v){
 	}
 	return;
 }
+
+void setNominial(KDL::JntArray &nom, double x, double y){
+	
+
+}   
 
 /*
 KDL::Frame vectorToFrame(std::vector<double> v)

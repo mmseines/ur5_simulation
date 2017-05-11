@@ -1,4 +1,4 @@
-#include "include/ur_kin.h"
+#include "ur_kin.h"
 
 #include <math.h>
 #include <stdio.h>

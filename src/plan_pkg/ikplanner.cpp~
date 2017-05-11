@@ -2,12 +2,15 @@
 	
 */
 //Header
-#include "include/ikplanner.hpp"
+
+#include "ikplanner.hpp"
+#include "trac_planner.hpp"
 
 // ROS message types.
 #include <geometry_msgs/Pose.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
+#include <cmath>
 
 // ROS and "MoveIt!" packages. Some of these are probably not needed. 
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -34,49 +37,47 @@
 //#include <descartes_moveit/moveit_state_adapter.h>
 #include <urdf/model.h>
 #include <eigen_conversions/eigen_kdl.h>
+#include <kdl_parser/kdl_parser.hpp>
 #include <tf_conversions/tf_kdl.h>
 #include <ur_kinematics/ur_kin.h>
 
+
 //Action lib
-#include <actionlib/client/simple_action_client.h>
+//#include <actionlib/client/simple_action_client.h>
 
 
-
+/*
+		Main function
+*/
 int main(int argc, char **argv)
 {
-/*
-	Setup rosnode and spinner.
-*/
-	ros::init(argc, argv, "path_sim");
+
+	ros::init(argc, argv, "path_sism");
 	ros::NodeHandle n;	
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
 
+
 /*
 	Load urdf, setup joint model groups and kinematic state. 
 */
+
 	robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-  robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
+	robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
 	ROS_INFO("Model frame: %s", robot_model->getModelFrame().c_str());
 	planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model));
-	
 	robot_state::RobotStatePtr kinematic_state(new robot_state::RobotState(robot_model));
 	kinematic_state->setToDefaultValues();
+
 
  	//Get joint model names and group values
 	const robot_state::JointModelGroup * joint_model_group = robot_model->getJointModelGroup("manipulator");
 	const std::vector<std::string>  joint_names = joint_model_group->getJointModelNames();
+	
 	std::vector<double> joint_values;	
-	kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
-
-	ROS_INFO("Robot joint group loaded... names of joints are as follows:"); 
-	for(std::size_t i = 0; i < joint_names.size(); ++i)
-	{
-  	ROS_INFO("Joint %s", joint_names[i].c_str());
-	}	
 
 
-/* -----------------------------Loading planner --------------------- */
+/* -----------------------------Loading planner --------------------- (necessary for constraint based pose goal planning.) */
 	boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
   planning_interface::PlannerManagerPtr planner_instance;
   std::string planner_plugin_name = "ompl_interface/OMPLPlanner";
@@ -84,23 +85,16 @@ int main(int argc, char **argv)
   // Get name from the ROS param server, and then load the planner
   if (!n.getParam("planning_plugin", planner_plugin_name))
     ROS_FATAL_STREAM("Could not find planner plugin name");
-  try
-  {
+  try{
     planner_plugin_loader.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>("moveit_core", "planning_interface::PlannerManager"));
-  }
-  catch(pluginlib::PluginlibException& ex)
-  {
+  }catch(pluginlib::PluginlibException& ex){
     ROS_FATAL_STREAM("Exception while creating planning plugin loader " << ex.what());
-  }
-  try
-  {
+  }try{
     planner_instance.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
     if (!planner_instance->initialize(robot_model, n.getNamespace()))
       ROS_FATAL_STREAM("Could not initialize planner instance");
     ROS_INFO_STREAM("Using planning interface '" << planner_instance->getDescription() << "'");
-  }
-  catch(pluginlib::PluginlibException& ex)
-  {
+  }catch(pluginlib::PluginlibException& ex){
     const std::vector<std::string> &classes = planner_plugin_loader->getDeclaredClasses();
     std::stringstream ss;
     for (std::size_t i = 0 ; i < classes.size() ; ++i)
@@ -109,30 +103,38 @@ int main(int argc, char **argv)
                      << "Available plugins: " << ss.str());
 	}
 
+	std::vector< std::string> algs;
+	planner_instance->getPlanningAlgorithms(algs);
+	std::stringstream sstr;
+	for(int i = 0; i < algs.size(); i++){
+		sstr << algs[i] << "\n";
+	}
+	ROS_INFO_STREAM("algorithms: " << sstr.str() << "....");
 /* ----------------- End planner loader --------*/
 
-	/* Moveit group interface for actually moving the robot */	
+	
+
+/* Moveit group interface for actually moving the robot */	
 	moveit::planning_interface::MoveGroup group("manipulator");
 
-	/* Specify tolerance and declare request and response */
-	double tolerance_below = 1e-3;
-	double tolerance_above = 1e-3;	
-
+	/* Specify tolerance and declare request and response */	
 	planning_interface::MotionPlanRequest req;
 	req.group_name = "manipulator";
+	req.planner_id = "manipulator";
 	planning_interface::MotionPlanResponse res;
 	moveit_msgs::MotionPlanResponse response;
 /* Specify bounds on the workspace */
 
-	double scale = 100; //Viewpoint planning done in cm, but ros operates with m.
-
+	double tolerance_below = 1e-3;
+	double tolerance_above = 1e-3;
+	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
 	req.workspace_parameters.min_corner.z = -0.05;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.7;
 	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y = req.workspace_parameters.max_corner.z =  0.7;
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/detailedPath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -142,85 +144,126 @@ int main(int argc, char **argv)
 
 	int count = 0;
 	
-	double tf_matrix[4][4] = {
-			1,0,0,0,
-			0,1,0,0,
-			0,0,1,0,
-			0,0,0,1,
-		};
-	KDL::Frame frame;
+	double tf_matrix[4][4];
 
-	while(std::getline(f, line))
+	std::vector<double> curr_joint_states;
+
+	while(std::getline(f, line) && ros::ok())
 	{	
+		count++;
+		if(!std::getline(f,line)){
+			count++;
+			break;
+		}
 		/*
 			IDEA: Rewrite this to operate on start position and goal position. 
 						- Test if that makes anything more simple. 
 		*/
+
 		double pose [6];
 		getPose(line, pose);
 
-		tf::Quaternion q = tf::createQuaternionFromRPY(pose[3], pose[4],pose[5]);
-	
-		geometry_msgs::Pose viewpoint;
+		pose[0] = pose[0]/scale;
+		pose[1] = pose[1]/scale;
+		pose[2] = pose[2]/scale;
+		
+		//getTransform(pose,tf_matrix); //Own solution... 
 
-		viewpoint.orientation.x = q.x();
-		viewpoint.orientation.y = q.y();
-		viewpoint.orientation.z = q.z();
-		viewpoint.orientation.w = q.w();
-		viewpoint.position.x = (pose[0]/scale);
-		viewpoint.position.y = (pose[1]/scale);
-		viewpoint.position.z = (pose[2]/scale);
+		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
+  	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
+		Eigen::Matrix4d m = (t * r).matrix();	
+		setFromMatrix(m, tf_matrix);
 
-		getTransform(pose, tf_matrix);
+		double q_ik_sols[8][6];
+		std::vector< std::vector<double> > valid_solutions;
+		double weights[6] = {8.0, 1.0, 1.0 ,1.0, 1.0, 1.0};
 
-		ROS_INFO("THIS IS FINE");
-		//Need to fix the pose matrix.
-		double q_ik_sols[8][6]; 
-
-		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.001f);
-		//Need to check validity of theese solutions though...
-
-		ROS_INFO("Inverse kinematics gave: %i, solutions", num_sols); 
+		//Compute inverse kinematics and check them to be within joint limits -pi to pi
+		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f);  
+		for(int i = 0; i < num_sols; i++){
+			std::vector<double> val_sol;
+			for(int q = 0; q < 6; q++){
+				if (q_ik_sols[i][q] != q_ik_sols[i][q] || !std::isfinite(q_ik_sols[i][q]) ){ //Check for nan / inf
+					break;				
+				}else if(i == 5){
+						//do nothing.
+				}else if( fabs(q_ik_sols[i][q]) <= M_PI ){
+						val_sol.push_back(q_ik_sols[i][q]);
+				}else if( q_ik_sols[i][q] + 2*M_PI <= M_PI || q_ik_sols[i][q] - 2*M_PI >= -M_PI){
+						val_sol.push_back(q_ik_sols[i][q] - sgn(q_ik_sols[i][q])*2*M_PI);
+				}else{
+					ROS_ERROR("WUT? %0.2f", q_ik_sols[i][q]);
+					break;
+				}  
+			}
+			if(val_sol.size() == 6 && (val_sol[1] > -3.1 && val_sol[1]< 0.04)){ // could be stricter, avoiding configurations where the lift joint is bent downward.
+					valid_solutions.push_back(val_sol);
+			}
+			val_sol.clear();  				
+		}
+		
+		ROS_INFO("Inverse kinematics gave: %i, solutsions where %i where valid", num_sols, (int) valid_solutions.size()); 
 		
 		//bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
 		
 
 		/*
 			Consider using ros descartes_moveit wrapper, as it contains this type of functionallity.
-		
+		*/
 
-		if (found_ik)
+		if (valid_solutions.size() != 0)
 		{
-  		kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
+			//semi temp fix to get current state. 
+			moveit::core::RobotState blah = *group.getCurrentState();
+			blah.copyJointGroupPositions(joint_model_group, curr_joint_states);
+			planning_scene->setCurrentState(*group.getCurrentState());			
 
-			ROS_INFO("Succesful IK for viewpoint number: %i", count); 
-			planning_scene->setCurrentState(*group.getCurrentState());
+			collision_detection::CollisionRequest c_req;
+			c_req.contacts = 1;  // check for self collision via contact. 
+			collision_detection::CollisionResult c_res;			
+			joint_values.clear();			//Incase there are no solutions without self collision.
+
+			double min_distance = FLT_MAX;		
+			for(int i = 0; i < valid_solutions.size(); i++) {
+				double dis = weightedDistance(curr_joint_states, valid_solutions[i], weights);									
+				
+				if( dis < min_distance){
+					blah.setJointGroupPositions(joint_model_group, valid_solutions[i]);
+					//planning_scene->setCurrentState(blah);
+					planning_scene->checkSelfCollision(c_req, c_res, blah);	
+			
+					if(!c_res.collision){
+						min_distance = dis;			
+						joint_values = valid_solutions[i];
+					}
+				}
+			}
+
+			
+			if(joint_values.size() != 6){
+				ROS_ERROR("Error selecting IK solution: %i, size of joint state vector = %zu, number of assumed valid solutions: %zu", count, joint_values.size(), valid_solutions.size());
+				continue;
+			}
 
 			//Define goals etc.
 			robot_state::RobotState goal_state(robot_model);
 			goal_state.setJointGroupPositions(joint_model_group, joint_values);
   		moveit_msgs::Constraints joint_goal = kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group, tolerance_below, tolerance_above);
   		req.goal_constraints.clear();
-			req.goal_constraints.push_back(joint_goal);		
+			req.goal_constraints.push_back(joint_goal);				
 
-			/* Call the Planner 
+			/* Call the Planner */
 			planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
   		context->solve(res);
-  		/* Check that the planning was successful 
+
   		if(res.error_code_.val != res.error_code_.SUCCESS)
   		{
-   			ROS_ERROR("Could not compute plan successfully... printing goal");
-				for(std::size_t i=0; i < joint_names.size(); ++i)
-				{
-    			ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
-  			}
-		
-				//return 0; 
-				continue;
+   			ROS_ERROR("Could not compute plan sucsessfully for wp: %i", count );
+					
+				//return 0;
 			}else{
-				/*
-					Apparantly the planning was sucessfull. 								
-				
+			
+				//Success 
 				res.getMessage(response);				
 				moveit::planning_interface::MoveGroup::Plan plan;
 				moveit_msgs::RobotTrajectory trajectory = response.trajectory;
@@ -236,21 +279,18 @@ int main(int argc, char **argv)
 				plan.start_state_ = response.trajectory_start;			
 				plan.trajectory_ = trajectory;
 				
-				
 				//And this works somehow.
-				group.execute(plan);  
+				group.execute(plan);
 
 			}
 
 
-
+			
 		}else{
   		ROS_ERROR("Did not find IK solution for viewpoint %i", count);
-			double dist = std::sqrt(pow(viewpoint.position.x,2.0) +	pow(viewpoint.position.y,2.0)+ pow(viewpoint.position.z,2.0));	
-			ROS_ERROR("The viewpoint has a distance of %0.2f from the base joint", dist);
+				
 		}
-		*/
-		count++;
+		
 		
 	}
 return 0;
@@ -279,15 +319,15 @@ void getTransform(double * pose, double tf[][4]){
 	double pitch = pose[4];
 	double yaw = pose[5];
 	
-//top row
+//Standard Rot matrix from RPY.
 	tf[0][0] = cos(yaw)*cos(pitch);
 	tf[0][1] = cos(yaw)*sin(pitch)*sin(roll) - sin(yaw)*cos(roll);
 	tf[0][2] = cos(yaw)*sin(pitch)*cos(roll) + sin(yaw)*sin(roll);
-//middle row
+
 	tf[1][0] = sin(yaw)*cos(pitch);
 	tf[1][1] = sin(yaw)*sin(pitch)*sin(roll) + cos(yaw)*cos(roll);	
 	tf[1][2] = sin(yaw)*sin(pitch)*cos(roll) - cos(yaw)*sin(roll);
-//bottom row
+
 	tf[2][0] = -sin(pitch);
 	tf[2][1] = cos(pitch)*sin(roll);
 	tf[2][2] = cos(pitch)*cos(roll);
@@ -295,8 +335,46 @@ void getTransform(double * pose, double tf[][4]){
 //position (4th column)
 	tf[0][3] = pose[0];
 	tf[1][3] = pose[1];
-	tf[2][3] = pose[2]; 
+	tf[2][3] = pose[2];
+	tf[3][3] = 1;  
 
+	return;
+}
+
+//Stolen from stackoverflow...
+Eigen::Affine3d createRotationMatrix(double ax, double ay, double az){
+	Eigen::Affine3d rx =
+      Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
+  Eigen::Affine3d ry =
+      Eigen::Affine3d(Eigen::AngleAxisd(ay, Eigen::Vector3d(0, 1, 0)));
+  Eigen::Affine3d rz =
+      Eigen::Affine3d(Eigen::AngleAxisd(az, Eigen::Vector3d(0, 0, 1)));
+  return rz * ry * rx;
+}
+
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+//Simple weighted sum. 
+double weightedDistance(std::vector<double> p, std::vector<double> v, double w[6]){
+	if(p.size() != v.size()){
+		ROS_ERROR("Distance between states cannot be found, as states have different dimension");		
+		return -1;
+	}
+	double sum = 0.0;
+	for(int i = 0; i< p.size(); i++){
+		sum += std::pow(p[i] - v[i], 2)*w[i];
+	}
+	return std::sqrt(sum); 
+}
+
+void setFromMatrix(Eigen::Matrix4d m, double tf[][4]){
+	for(int n = 0; n < 4; n++){
+			for(int q = 0; q < 4; q++){
+				tf[n][q] = m(n, q);
+			}
+	}
 	return;
 }
 

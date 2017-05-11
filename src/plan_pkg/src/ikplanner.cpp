@@ -297,6 +297,11 @@ return 0;
 }
 
 
+
+
+
+
+
 //Simple help function
 void getPose(std::string s, double* v){
 	int p = 0;

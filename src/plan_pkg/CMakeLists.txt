@@ -126,19 +126,20 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-add_executable(sim planner.cpp)
-add_executable(tSim trac_planner.cpp)
+add_executable(sim src/planner.cpp)
+add_executable(tSim src/trac_planner.cpp)
 add_executable(ikSim 
-	ikplanner.cpp
-	ur_kin.cpp
+	src/ikplanner.cpp
+	utils/ur_kin.cpp
 )
+#add_executable(${PROJECT_NAME}_tutorial2 src/tutorial2.cpp)
 
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 
 
-## Specify libraries to link a library or executable target against
+## Specify libraries to link a library or executable target againstcatkin
 target_link_libraries(sim
   ${catkin_LIBRARIES} 
 )
@@ -148,6 +149,27 @@ target_link_libraries(tSim
 target_link_libraries(ikSim
   ${catkin_LIBRARIES} 
 )
+#target_link_libraries(${PROJECT_NAME}_tutorial2
+#  ${catkin_LIBRARIES}
+#)
+
+
+#set_target_properties(${PROJECT_NAME}_tutorial2
+#  PROPERTIES OUTPUT_NAME tutorial2
+#  PREFIX "")
+
+## is this necessary?
+#install(TARGETS ${PROJECT_NAME}_tutorial2
+#  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+#  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+#)
+
+#install(DIRECTORY include/${PROJECT_NAME}/
+#  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+#  FILES_MATCHING PATTERN "*.h"
+#)
+
 
 
 
