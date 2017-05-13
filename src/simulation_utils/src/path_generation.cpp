@@ -31,18 +31,21 @@ namespace tutorial_utilities
 		// This function crashes the program. 
   std::vector<Eigen::Affine3d> line(	Eigen::Affine3d start_pose, Eigen::Affine3d end_pose, int steps)
 	{
-		Eigen::Vector3d translation_vector;
-		translation_vector = end_pose.translation() - start_pose.translation();
-		translation_vector = translation_vector/steps;
-		Eigen::Translation<double,3> translate(translation_vector);
+		/*
+			top 4 commented out code somehow crashes. 
+		*/
+		//Eigen::Vector3d translation_vector;
+		//translation_vector = end_pose.translation() - start_pose.translation();
+		//translation_vector = translation_vector/(steps + 1);
+		//Eigen::Translation<double,3> translate(translation_vector);
 
 		std::vector<Eigen::Affine3d> poses;
 		poses.push_back(start_pose);
-		for(int i = 0; i < (steps - 1); ++i)
-		{
-			Eigen::Affine3d tmp(translate * poses.back());
-			poses.push_back(tmp);
-		}
+		poses.push_back(end_pose);
+		//for(int i = 0; i < (steps); ++i)
+		//{
+			//poses.push_back(translate * poses.back());
+		//}
 		return poses;
 	}
 }

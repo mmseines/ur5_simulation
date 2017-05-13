@@ -133,6 +133,7 @@ add_executable(ikSim
 	src/ikplanner.cpp
 	utils/ur_kin.cpp
 )
+add_executable(dSim src/desc_planner.cpp)
 #add_executable(${PROJECT_NAME}_tutorial2 src/tutorial2.cpp)
 
 
@@ -148,6 +149,9 @@ target_link_libraries(tSim
   ${catkin_LIBRARIES} 
 )
 target_link_libraries(ikSim
+  ${catkin_LIBRARIES} 
+)
+target_link_libraries(dSim
   ${catkin_LIBRARIES} 
 )
 #target_link_libraries(${PROJECT_NAME}_tutorial2
