@@ -2,7 +2,7 @@ README
 
 Work in progress...
 
-Attempt at simulated an automaticly generated inspection path using a Intel Realsense sr300 device to observe an object. 
+Attempt at simulating an automaticly generated inspection path using a Intel Realsense sr300 device to observe an object. 
 
 
 
