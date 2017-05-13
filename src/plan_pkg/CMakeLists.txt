@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
 	moveit_ros_robot_interaction
 	pluginlib
 	trac_ik_lib
+	tutorial_utilities REQUIRED
 )
 
 ## System dependencies are found with CMake's conventions

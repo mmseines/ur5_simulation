@@ -18,8 +18,8 @@
 // Includes the planner we will be using
 #include <descartes_planner/dense_planner.h>
 
-//#include <tutorial_utilities/path_generation.h>
-//#include <tutorial_utilities/collision_object_utils.h>
+#include <tutorial_utilities/path_generation.h>
+#include <tutorial_utilities/collision_object_utils.h>
 #include <ros/ros.h>
 #include </usr/include/eigen3/Eigen/Geometry>
 #include <moveit_msgs/PlanningScene.h>
@@ -27,12 +27,12 @@
 #include <std_msgs/ColorRGBA.h>
 #include <geometric_shapes/shape_operations.h>
 
-//#include <tutorial_utilities/visualization.h>
+#include <tutorial_utilities/visualization.h>
 
 // Include the visualisation message that will be used to
 // visualize the trajectory points in RViz
 #include <visualization_msgs/MarkerArray.h>
-/*
+
 typedef std::vector<descartes_core::TrajectoryPtPtr> TrajectoryVec;
 typedef TrajectoryVec::const_iterator TrajectoryIter;
 
@@ -49,34 +49,31 @@ trajectory_msgs::JointTrajectory
 toROSJointTrajectory(const TrajectoryVec& trajectory, const descartes_core::RobotModel& model,
                      const std::vector<std::string>& joint_names, double time_delay);
 
-*/
+
 bool executeTrajectory(const trajectory_msgs::JointTrajectory& trajectory);
 
 /**
  * Waits for a subscriber to subscribe to a publisher
  */
-//bool waitForSubscribers(ros::Publisher & pub, ros::Duration timeout);
+bool waitForSubscribers(ros::Publisher & pub, ros::Duration timeout);
 
 /**
  * Add the welding object (l-profile) to the planning scene.
  * This is put in a function to keep the tutorial more readable.
  */
-//void addWeldingObject(moveit_msgs::PlanningScene& planningScene);
+void addWeldingObject(moveit_msgs::PlanningScene& planningScene);
 
 /**
  * Add the welding table to the planning scene.
  * This is put in a function to keep the tutorial more readable.
  */
-//void addTable(moveit_msgs::PlanningScene& planningScene);
+void addTable(moveit_msgs::PlanningScene& planningScene);
 
-int main(int argc, char** argv){
-	return 0;
-}
 
 /**********************
   ** MAIN LOOP
 **********************/
-/*
+
 int main(int argc, char** argv)
 {
   // Initialize ROS
@@ -92,8 +89,8 @@ int main(int argc, char** argv)
   // 0. Add objects to planning scene
   moveit_msgs::PlanningScene planning_scene;
   
-  addTable(planning_scene);
-  addWeldingObject(planning_scene);
+  //addTable(planning_scene);
+  //addWeldingObject(planning_scene);
 
   ros::Publisher scene_diff_publisher;
   scene_diff_publisher = nh.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
@@ -110,38 +107,49 @@ int main(int argc, char** argv)
   } else {
     ROS_ERROR("No subscribers connected, collision object not added");
   }
-
   // 1. Define sequence of points
+	//35.698,17.7734,16.8147,0,0.429204,2.65841
+	//370842,199594,157,0,0.429204,3.05841	
+
   double x, y, z, rx, ry, rz;
-  x = 2.0 - 0.025;
-  y = 0.0;
-  z = 0.008 + 0.025;
+  x = 0.35698;
+  y = 0.177734;
+  z = 0.168147;
   rx = 0.0;
-  ry = (M_PI / 2) + M_PI/4;
-  rz = 0.0;
+  ry = 0.429204;
+  rz = 2.65841;
   TrajectoryVec points;
-  int N_points = 9;
+  int N_points = 6;
+	
+	double x2 = 0.370842;
+	double y2 = 0.199594;
+	double z2 = 0.157;
+	double rz2 = 3.05841;
 
   std::vector<Eigen::Affine3d> poses;
   Eigen::Affine3d startPose;
   Eigen::Affine3d endPose;
   startPose = descartes_core::utils::toFrame(x, y, z, rx, ry, rz, descartes_core::utils::EulerConventions::XYZ);
-  endPose = descartes_core::utils::toFrame(x, y + 0.4, z, rx, ry, rz, descartes_core::utils::EulerConventions::XYZ);
+  endPose = descartes_core::utils::toFrame(x2, y2, z2, rx, ry, rz2, descartes_core::utils::EulerConventions::XYZ);
+	poses.push_back(startPose);
+	poses.push_back(endPose);
+	
   poses = tutorial_utilities::line(startPose, endPose, N_points);
 
+	ROS_INFO("looking for error 1");
   for (unsigned int i = 0; i < N_points; ++i)
   {
     descartes_core::TrajectoryPtPtr pt = makeTolerancedCartesianPoint(poses[i], 0.0, 0.4, M_PI);
     points.push_back(pt);
   }
-
+	ROS_INFO("looking for error 2");
   // Visualize the trajectory points in RViz
   // Transform the generated poses into a markerArray message that can be visualized by RViz
   visualization_msgs::MarkerArray ma;
   ma = tutorial_utilities::createMarkerArray(poses);
   // Start the publisher for the Rviz Markers
   ros::Publisher vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "visualization_marker_array", 1 );
-
+	ROS_INFO("looking for error 3");
   // Wait for subscriber and publish the markerArray once the subscriber is found.
   ROS_INFO("Waiting for marker subscribers.");
   if(waitForSubscribers(vis_pub, ros::Duration(2.0)))
@@ -156,7 +164,7 @@ int main(int argc, char** argv)
 
 
   // 2. Create a robot model and initialize it
-  descartes_core::RobotModelPtr model (new descartes_moveit::IkFastMoveitStateAdapter);
+  descartes_core::RobotModelPtr model (new descartes_moveit::MoveitStateAdapter);
 
   //Enable collision checking
   model->setCheckCollisions(true);
@@ -340,7 +348,7 @@ void addWeldingObject(moveit_msgs::PlanningScene& scene)
   pose = descartes_core::utils::toFrame( 2.0, 0.0, 0.012, 0.0, 0.0, M_PI_2, descartes_core::utils::EulerConventions::XYZ);
   //ros::package::getPath('descartes_tutorials')
   scene.world.collision_objects.push_back(
-    tutorial_utilities::makeCollisionObject("package://descartes_tutorials/meshes/profile.stl", scale, "Profile", pose)
+    tutorial_utilities::makeCollisionObject("package://plan_pkg/meshes/profile.stl", scale, "Profile", pose)
     );
   scene.object_colors.push_back(tutorial_utilities::makeObjectColor("Profile", 0.5, 0.5, 0.5, 1.0));
 }
@@ -351,7 +359,7 @@ void addTable(moveit_msgs::PlanningScene& scene)
   Eigen::Affine3d pose;
   pose = descartes_core::utils::toFrame(1.5, -0.6, 0.0, 0.0, 0.0, 0.0, descartes_core::utils::EulerConventions::XYZ);
   scene.world.collision_objects.push_back(
-    tutorial_utilities::makeCollisionObject("package://descartes_tutorials/meshes/table.stl", scale, "Table", pose)
+    tutorial_utilities::makeCollisionObject("package://plan_pkg/meshes/table.stl", scale, "Table", pose)
     );
   scene.object_colors.push_back(tutorial_utilities::makeObjectColor("Table", 0.2, 0.2, 0.2, 1.0));
 }

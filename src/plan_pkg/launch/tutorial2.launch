@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
-  <param name="workObjectPath" value="$(find descartes_tutorials)/meshes/profile.stl"/>
+  <param name="workObjectPath" value="$(find plan_pkg)/meshes/profile.stl"/>
   <param name="workObjectID" value="l_profile"/>
-  <node name="tutorial2" pkg="plan_pkg" type="plan_pkg_tutorial2" output="screen" />
+  <node name="tutorial2" pkg="plan_pkg" type="sim" output="screen" />
   
 </launch>

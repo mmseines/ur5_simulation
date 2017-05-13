@@ -202,7 +202,7 @@ bool MoveitStateAdapter::getAllIK(const Eigen::Affine3d& pose, std::vector<std::
         std::vector<std::vector<double> >::iterator joint_pose_it;
         bool match_found = false;
         for (joint_pose_it = joint_poses.begin(); joint_pose_it != joint_poses.end(); ++joint_pose_it)
-        {
+        { 
           if (descartes_core::utils::equal(joint_pose, (*joint_pose_it), epsilon))
           {
             logDebug("Found matching, potential solution is not new");
