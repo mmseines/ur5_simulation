@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package>
+  <name>ur5_with_sr300_support</name>
+  <version>0.1.0</version>
+  <description>
+               Ur5 with an intel realsense 300 camera added.
+  </description>
+
+  <maintainer email="mmseines@gmail.com">Magnus Seines</maintainer>
+
+  <license>BSD</license>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  
+</package>

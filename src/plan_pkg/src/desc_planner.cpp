@@ -173,7 +173,7 @@ int main(int argc, char** argv)
   const std::string robot_description = "robot_description";
 
   // name of the kinematic group you defined when running MoveitSetupAssistant
-  const std::string group_name = "manipulator";
+  const std::string group_name = "manipulator2";
 
   // Name of frame in which you are expressing poses. Typically "world_frame" or "base_link".
   const std::string world_frame = "base_link";
