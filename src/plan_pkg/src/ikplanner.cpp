@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
-		double weights[6] = {8.0, 1.0, 1.0 ,1.0, 1.0, 1.0};
+		double weights[6] = {8.0, 4.0, 1.0 ,0.2, 0.2, 2.0};
 
 		//Compute inverse kinematics and check them to be within joint limits -pi to pi
 		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f);  

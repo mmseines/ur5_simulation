@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	moveit::planning_interface::MoveGroup group("manipulator");
 	//moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 	
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/obstaclePath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
 	if( !f.is_open())
 		return 0;
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
   group.setPlanningTime(1000.0);
 
 	double fraction = group.computeCartesianPath(waypoints,
-                                             0.00005,  // eef_step
+                                             0.03,  // eef_step
                                              0.0,   // jump_threshold
                                              trajectory);
 			//bool success = group.plan(my_plan);
