@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <node type="point_cloud_assembler" pkg="laser_assembler" name="my_assembler">
+    <remap from="cloud2" to="/camera/depth/points"/>
+    <param name="max_clouds" type="int" value="400" />
+    <param name="fixed_frame" type="string" value="base_link" />
+  </node>
+</launch>
