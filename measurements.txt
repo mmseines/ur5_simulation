@@ -1,0 +1,15 @@
+Measurements sr300
+
+width of usb outlet: 48.38 mm
+height of usb outlet: 10.40 mm
+
+
+distance from screw hole to base: 38 mm
+Distance between bumps in usb outlet: 19mm
+
+
+measurements ur5:
+
+base to ground 105 cm
+table to ground 71 cm
+base to table center: 50 cm (x^2 + y^2)
