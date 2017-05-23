@@ -236,8 +236,12 @@ int main(int argc, char **argv)
 		pose[1] = pose[1]/scale;
 		pose[2] = pose[2]/scale;
 		
+		//take height for end effector. *OOPS* critical. in this case: position is - ([0.045, 0.0, 0.035]) the direction the end effector is facing.  
 
 		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
+		Eigen::Vector3d v(0.045, 0.0, 0.035);
+		Eigen::Vector3d v2(v, r);		
+ 
   	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
 		Eigen::Matrix4d m = (t * r).matrix();	
 		setFromMatrix(m, tf_matrix);
