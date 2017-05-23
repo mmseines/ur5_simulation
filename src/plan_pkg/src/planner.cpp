@@ -37,6 +37,12 @@
 #include <moveit/robot_state/conversions.h>
 
 
+// -----------------
+#include <moveit_msgs/AttachedCollisionObject.h>
+#include <moveit_msgs/GetStateValidity.h>
+#include <moveit_msgs/DisplayRobotState.h>
+#include <moveit_msgs/ApplyPlanningScene.h>
+
 void getPose(std::string s, double* v){
 	int p = 0;
 	int q = 0;
@@ -62,10 +68,64 @@ int main(int argc, char **argv)
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
 
+	ros::Duration sleep_time(10.0);
+
 	moveit::planning_interface::MoveGroup group("manipulator");
 	//moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 	
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
+// ---------------- Add collision object(s). -----------------
+	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
+  while(planning_scene_diff_publisher.getNumSubscribers() < 1)
+  {
+    ros::WallDuration sleep_t(0.5);
+    sleep_t.sleep();
+	}
+
+	moveit_msgs::CollisionObject table;
+	table.id = "table";
+	shape_msgs::SolidPrimitive primitive;
+	primitive.type = primitive.BOX;
+  primitive.dimensions.resize(3);
+  primitive.dimensions[0] = 1.0;
+  primitive.dimensions[1] = 1.0;
+	primitive.dimensions[2] = 0.1;
+
+	table.primitives.push_back(primitive);
+	
+	table.header.frame_id = "/world";
+
+	geometry_msgs::Pose table_pose;
+	table_pose.position.z = -0.3;
+	table_pose.position.x = 0.2;
+	table_pose.position.y = 0.2;
+	table_pose.orientation.x = 0.0;
+	table_pose.orientation.y = 0.0;
+	table_pose.orientation.z = 0.0;
+	table_pose.orientation.w = 0.0;
+
+	table.primitive_poses.push_back(table_pose);
+
+	table.operation = table.ADD;
+
+	moveit_msgs::PlanningScene planning_sc;
+  planning_sc.world.collision_objects.push_back(table);
+  planning_sc.is_diff = true;
+  planning_scene_diff_publisher.publish(planning_sc);
+	sleep_time.sleep();
+	
+	ros::ServiceClient planning_scene_diff_client = n.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
+  planning_scene_diff_client.waitForExistence();
+// and send the diffs to the planning scene via a service call:
+  moveit_msgs::ApplyPlanningScene srv;
+  srv.request.scene = planning_sc;
+	planning_scene_diff_client.call(srv);
+
+// ------------- End adding collision objects. -----------
+
+
+
+
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fiveByFive_cube.csv");
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
 	if( !f.is_open())
 		return 0;
@@ -108,7 +168,7 @@ int main(int argc, char **argv)
   group.setPlanningTime(1000.0);
 
 	double fraction = group.computeCartesianPath(waypoints,
-                                             0.03,  // eef_step
+                                             0.025,  // eef_step
                                              0.0,   // jump_threshold
                                              trajectory);
 			//bool success = group.plan(my_plan);

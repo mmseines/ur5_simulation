@@ -42,8 +42,13 @@
 #include <ur_kinematics/ur_kin.h>
 
 
-//Action lib
+//Planning scene collision objects.
+#include <moveit_msgs/AttachedCollisionObject.h>
+#include <moveit_msgs/GetStateValidity.h>
+#include <moveit_msgs/DisplayRobotState.h>
+#include <moveit_msgs/ApplyPlanningScene.h>
 //#include <actionlib/client/simple_action_client.h>
+#include <sys/time.h>
 
 
 /*
@@ -56,8 +61,18 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;	
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
+	
+	ros::Duration sleep_time(10.0);
 
+	timeval start_t;
+	timeval stop_t;
+	
 
+	long execution_time_ms = 0;
+	long planning_time_ms = 0;
+	long init_time_ms = 0; 
+	
+	gettimeofday(&start_t, NULL);
 /*
 	Load urdf, setup joint model groups and kinematic state. 
 */
@@ -76,6 +91,7 @@ int main(int argc, char **argv)
 	
 	std::vector<double> joint_values;	
 
+	
 
 /* -----------------------------Loading planner --------------------- (necessary for constraint based pose goal planning.) */
 	boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
@@ -111,7 +127,6 @@ int main(int argc, char **argv)
 	}
 	ROS_INFO_STREAM("algorithms: " << sstr.str() << "....");
 /* ----------------- End planner loader --------*/
-
 	
 
 /* Moveit group interface for actually moving the robot */	
@@ -125,16 +140,66 @@ int main(int argc, char **argv)
 	moveit_msgs::MotionPlanResponse response;
 /* Specify bounds on the workspace */
 
+
+// ----------- Add collision for table. ----------------------
+	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
+  while(planning_scene_diff_publisher.getNumSubscribers() < 1)
+  {
+    ros::WallDuration sleep_t(0.5);
+    sleep_t.sleep();
+	}
+
+	moveit_msgs::CollisionObject table;
+	table.id = "table";
+	shape_msgs::SolidPrimitive primitive;
+	primitive.type = primitive.BOX;
+  primitive.dimensions.resize(3);
+  primitive.dimensions[0] = 1.0;
+  primitive.dimensions[1] = 1.0;
+	primitive.dimensions[2] = 0.1;
+
+	table.primitives.push_back(primitive);
+	
+	table.header.frame_id = "/world";
+
+	geometry_msgs::Pose table_pose;
+	table_pose.position.z = -0.3;
+	table_pose.position.x = 0.2;
+	table_pose.position.y = 0.2;
+	table_pose.orientation.x = 0.0;
+	table_pose.orientation.y = 0.0;
+	table_pose.orientation.z = 0.0;
+	table_pose.orientation.w = 0.0;
+
+	table.primitive_poses.push_back(table_pose);
+
+	table.operation = table.ADD;
+
+	moveit_msgs::PlanningScene planning_sc;
+  planning_sc.world.collision_objects.push_back(table);
+  planning_sc.is_diff = true;
+  planning_scene_diff_publisher.publish(planning_sc);
+	sleep_time.sleep();
+	
+	ros::ServiceClient planning_scene_diff_client = n.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
+  planning_scene_diff_client.waitForExistence();
+// and send the diffs to the planning scene via a service call:
+  moveit_msgs::ApplyPlanningScene srv;
+  srv.request.scene = planning_sc;
+	planning_scene_diff_client.call(srv);
+	
+//---------------------------------------------------------------------------------------------------------------
+
 	double tolerance_below = 1e-3;
 	double tolerance_above = 1e-3;
 	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
-	req.workspace_parameters.min_corner.z = -0.05;
-	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.7;
-	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y = req.workspace_parameters.max_corner.z =  0.7;
+	req.workspace_parameters.min_corner.z = -0.1;
+	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.8;
+	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y = req.workspace_parameters.max_corner.z =  0.8;
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fiveByFive_cube.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -148,6 +213,9 @@ int main(int argc, char **argv)
 
 	std::vector<double> curr_joint_states;
 
+	gettimeofday(&stop_t, NULL);
+	init_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
+ 
 	while(std::getline(f, line) && ros::ok())
 	{	
 		count++;
@@ -155,6 +223,7 @@ int main(int argc, char **argv)
 			count++;
 			break;
 		}
+		gettimeofday(&start_t, NULL);
 		/*
 			IDEA: Rewrite this to operate on start position and goal position. 
 						- Test if that makes anything more simple. 
@@ -167,7 +236,6 @@ int main(int argc, char **argv)
 		pose[1] = pose[1]/scale;
 		pose[2] = pose[2]/scale;
 		
-		//getTransform(pose,tf_matrix); //Own solution... 
 
 		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
   	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
@@ -204,12 +272,6 @@ int main(int argc, char **argv)
 		
 		ROS_INFO("Inverse kinematics gave: %i, solutsions where %i where valid", num_sols, (int) valid_solutions.size()); 
 		
-		//bool found_ik = kinematic_state->setFromIK(joint_model_group, viewpoint, 10, 0.1);
-		
-
-		/*
-			Consider using ros descartes_moveit wrapper, as it contains this type of functionallity.
-		*/
 
 		if (valid_solutions.size() != 0)
 		{
@@ -229,7 +291,6 @@ int main(int argc, char **argv)
 				
 				if( dis < min_distance){
 					blah.setJointGroupPositions(joint_model_group, valid_solutions[i]);
-					//planning_scene->setCurrentState(blah);
 					planning_scene->checkSelfCollision(c_req, c_res, blah);	
 			
 					if(!c_res.collision){
@@ -278,10 +339,17 @@ int main(int argc, char **argv)
 				//Finaly have a properly parametarized trajectory. 
 				plan.start_state_ = response.trajectory_start;			
 				plan.trajectory_ = trajectory;
-				
-				//And this works somehow.
-				group.execute(plan);
 
+				gettimeofday(&stop_t, NULL);
+				planning_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
+
+				gettimeofday(&start_t, NULL);
+				//And this works somehow.
+				group.execute(plan); //is this blocking? if not then how to time it?
+
+				gettimeofday(&stop_t, NULL);
+				execution_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
+				
 			}
 
 
@@ -293,7 +361,15 @@ int main(int argc, char **argv)
 		
 		
 	}
-return 0;
+	execution_time_ms = execution_time_ms/1000;
+	init_time_ms = execution_time_ms/1000;
+	planning_time_ms = execution_time_ms/1000; 
+	long total_time = execution_time_ms + init_time_ms + planning_time_ms;
+	ROS_INFO("total time spent %ld ms", total_time);
+	ROS_INFO("initialisation: %ld ms", init_time_ms);
+	ROS_INFO("Planning %ld ms", planning_time_ms);
+	ROS_INFO("Movement %ld ms", execution_time_ms);
+	return 0;
 }
 
 

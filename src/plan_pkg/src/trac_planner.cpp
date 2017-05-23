@@ -143,7 +143,7 @@ void tourToJointPosition(ros::NodeHandle& nh, std::string chain_start, std::stri
     	ik_solutions.push_back(tmp);
 		}
     if (int((double)i/tour.size()*100)%10 == 0)
-      ROS_INFO_STREAM_THROTTLE(1,int((i)/num_samples)<<"\% done");
+      ROS_INFO_STREAM_THROTTLE(1,float((i)/tour.size())<<"\% done");
   }
 
   ROS_INFO_STREAM("TRAC-IK found "<<success<<" solutions ("<<100.0*success/num_samples<<"\%) with an average of "<<total_time/num_samples<<" secs per sample");
@@ -187,7 +187,7 @@ int main(int argc, char** argv)
 	std::vector<KDL::JntArray> sol;
 	std::vector<geometry_msgs::Pose> tour;
 	
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fiveByFive_cube.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;

@@ -5,7 +5,7 @@
   <arg name="chain_end" default="wrist_3_link" />
   <arg name="timeout" default="0.05" />
 
-  <param name="robot_description" command="$(find xacro)/xacro.py '$(find ur_description)/urdf/ur5_joint_limited_robot.urdf.xacro'" />
+  <param name="robot_description" command="$(find xacro)/xacro.py '$(find ur5_with_sr300_support)/urdf/ur5_robot.urdf.xacro'" />
 
 
   <node name="trac_ik_test" pkg="plan_pkg" type="tSim" output="screen">
