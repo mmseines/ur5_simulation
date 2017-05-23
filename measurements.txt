@@ -13,3 +13,9 @@ measurements ur5:
 base to ground 105 cm
 table to ground 71 cm
 base to table center: 50 cm (x^2 + y^2)
+
+ee_link:
+
+4.5 cm ut
+3.5 cm opp.
+
