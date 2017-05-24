@@ -44,6 +44,7 @@ void setFromMatrix(Eigen::Matrix4d, double [][4]);
 */
 template <typename T> int sgn(T val);
 
+
 /*
 	Weigthed distance between two vectors. 
 */

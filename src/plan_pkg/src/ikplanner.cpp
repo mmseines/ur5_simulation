@@ -51,6 +51,10 @@
 #include <sys/time.h>
 
 
+Eigen::Vector3f x_axis(1, 0, 0);
+Eigen::Vector3f y_axis(0, 1, 0);
+Eigen::Vector3f z_axis(0, 0, 1);
+Eigen::Vector3f end_effector_offset(0.045, 0.0, 0.035);
 /*
 		Main function
 */
@@ -95,27 +99,27 @@ int main(int argc, char **argv)
 
 /* -----------------------------Loading planner --------------------- (necessary for constraint based pose goal planning.) */
 	boost::scoped_ptr<pluginlib::ClassLoader<planning_interface::PlannerManager> > planner_plugin_loader;
-  planning_interface::PlannerManagerPtr planner_instance;
-  std::string planner_plugin_name = "ompl_interface/OMPLPlanner";
+	planning_interface::PlannerManagerPtr planner_instance;
+	std::string planner_plugin_name = "ompl_interface/OMPLPlanner";
 
   // Get name from the ROS param server, and then load the planner
-  if (!n.getParam("planning_plugin", planner_plugin_name))
-    ROS_FATAL_STREAM("Could not find planner plugin name");
-  try{
-    planner_plugin_loader.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>("moveit_core", "planning_interface::PlannerManager"));
-  }catch(pluginlib::PluginlibException& ex){
-    ROS_FATAL_STREAM("Exception while creating planning plugin loader " << ex.what());
-  }try{
-    planner_instance.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
-    if (!planner_instance->initialize(robot_model, n.getNamespace()))
-      ROS_FATAL_STREAM("Could not initialize planner instance");
-    ROS_INFO_STREAM("Using planning interface '" << planner_instance->getDescription() << "'");
-  }catch(pluginlib::PluginlibException& ex){
-    const std::vector<std::string> &classes = planner_plugin_loader->getDeclaredClasses();
-    std::stringstream ss;
-    for (std::size_t i = 0 ; i < classes.size() ; ++i)
-      ss << classes[i] << " ";
-    ROS_ERROR_STREAM("Exception while loading planner '" << planner_plugin_name << "': " << ex.what() << std::endl
+	if (!n.getParam("planning_plugin", planner_plugin_name))
+		ROS_FATAL_STREAM("Could not find planner plugin name");
+	try{
+		planner_plugin_loader.reset(new pluginlib::ClassLoader<planning_interface::PlannerManager>("moveit_core", "planning_interface::PlannerManager"));
+	}catch(pluginlib::PluginlibException& ex){
+		ROS_FATAL_STREAM("Exception while creating planning plugin loader " << ex.what());
+	}try{
+		planner_instance.reset(planner_plugin_loader->createUnmanagedInstance(planner_plugin_name));
+		if (!planner_instance->initialize(robot_model, n.getNamespace()))
+			ROS_FATAL_STREAM("Could not initialize planner instance");
+		ROS_INFO_STREAM("Using planning interface '" << planner_instance->getDescription() << "'");
+	}catch(pluginlib::PluginlibException& ex){
+		const std::vector<std::string> &classes = planner_plugin_loader->getDeclaredClasses();
+		std::stringstream ss;
+		for (std::size_t i = 0 ; i < classes.size() ; ++i)
+				ss << classes[i] << " ";
+		ROS_ERROR_STREAM("Exception while loading planner '" << planner_plugin_name << "': " << ex.what() << std::endl
                      << "Available plugins: " << ss.str());
 	}
 
@@ -143,19 +147,19 @@ int main(int argc, char **argv)
 
 // ----------- Add collision for table. ----------------------
 	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
-  while(planning_scene_diff_publisher.getNumSubscribers() < 1)
-  {
-    ros::WallDuration sleep_t(0.5);
-    sleep_t.sleep();
+	while(planning_scene_diff_publisher.getNumSubscribers() < 1)
+	{
+		ros::WallDuration sleep_t(0.5);
+		sleep_t.sleep();
 	}
 
 	moveit_msgs::CollisionObject table;
 	table.id = "table";
 	shape_msgs::SolidPrimitive primitive;
 	primitive.type = primitive.BOX;
-  primitive.dimensions.resize(3);
-  primitive.dimensions[0] = 1.0;
-  primitive.dimensions[1] = 1.0;
+	primitive.dimensions.resize(3);
+	primitive.dimensions[0] = 1.0;
+	primitive.dimensions[1] = 1.0;
 	primitive.dimensions[2] = 0.1;
 
 	table.primitives.push_back(primitive);
@@ -176,16 +180,16 @@ int main(int argc, char **argv)
 	table.operation = table.ADD;
 
 	moveit_msgs::PlanningScene planning_sc;
-  planning_sc.world.collision_objects.push_back(table);
-  planning_sc.is_diff = true;
-  planning_scene_diff_publisher.publish(planning_sc);
+	planning_sc.world.collision_objects.push_back(table);
+	planning_sc.is_diff = true;
+	planning_scene_diff_publisher.publish(planning_sc);
 	sleep_time.sleep();
 	
 	ros::ServiceClient planning_scene_diff_client = n.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
-  planning_scene_diff_client.waitForExistence();
+	planning_scene_diff_client.waitForExistence();
 // and send the diffs to the planning scene via a service call:
-  moveit_msgs::ApplyPlanningScene srv;
-  srv.request.scene = planning_sc;
+	moveit_msgs::ApplyPlanningScene srv;
+	srv.request.scene = planning_sc;
 	planning_scene_diff_client.call(srv);
 	
 //---------------------------------------------------------------------------------------------------------------
@@ -215,7 +219,10 @@ int main(int argc, char **argv)
 
 	gettimeofday(&stop_t, NULL);
 	init_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
- 
+	
+	int sucess_points = 0;
+	int error_points = 0; 
+
 	while(std::getline(f, line) && ros::ok())
 	{	
 		count++;
@@ -224,10 +231,6 @@ int main(int argc, char **argv)
 			break;
 		}
 		gettimeofday(&start_t, NULL);
-		/*
-			IDEA: Rewrite this to operate on start position and goal position. 
-						- Test if that makes anything more simple. 
-		*/
 
 		double pose [6];
 		getPose(line, pose);
@@ -235,14 +238,18 @@ int main(int argc, char **argv)
 		pose[0] = pose[0]/scale;
 		pose[1] = pose[1]/scale;
 		pose[2] = pose[2]/scale;
-		
-		//take height for end effector. *OOPS* critical. in this case: position is - ([0.045, 0.0, 0.035]) the direction the end effector is facing.  
+		 
 
-		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
-		Eigen::Vector3d v(0.045, 0.0, 0.035);
-		Eigen::Vector3d v2(v, r);		
- 
-  	Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0],pose[1],pose[2])));
+		// calculate ee_offset. 
+  	Eigen::AngleAxisf mroll = Eigen::AngleAxisf(pose[3], x_axis);
+		Eigen::AngleAxisf mpitch = Eigen::AngleAxisf(pose[4],y_axis);
+  	Eigen::AngleAxisf myaw = Eigen::AngleAxisf(pose[5], z_axis);
+		
+		Eigen::Vector3f ee_offset = myaw*(mpitch*(mroll*end_effector_offset));
+		// ---
+	
+ 		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
+		Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0]-ee_offset[0],pose[1]- ee_offset[1],pose[2] - ee_offset[2])));
 		Eigen::Matrix4d m = (t * r).matrix();	
 		setFromMatrix(m, tf_matrix);
 
@@ -307,6 +314,7 @@ int main(int argc, char **argv)
 			
 			if(joint_values.size() != 6){
 				ROS_ERROR("Error selecting IK solution: %i, size of joint state vector = %zu, number of assumed valid solutions: %zu", count, joint_values.size(), valid_solutions.size());
+				error_points++;
 				continue;
 			}
 
@@ -324,7 +332,7 @@ int main(int argc, char **argv)
   		if(res.error_code_.val != res.error_code_.SUCCESS)
   		{
    			ROS_ERROR("Could not compute plan sucsessfully for wp: %i", count );
-					
+				error_points++;
 				//return 0;
 			}else{
 			
@@ -350,17 +358,17 @@ int main(int argc, char **argv)
 				gettimeofday(&start_t, NULL);
 				//And this works somehow.
 				group.execute(plan); //is this blocking? if not then how to time it?
-
+				
 				gettimeofday(&stop_t, NULL);
 				execution_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
-				
+				sucess_points++;
 			}
 
 
 			
 		}else{
   		ROS_ERROR("Did not find IK solution for viewpoint %i", count);
-				
+			error_points++;
 		}
 		
 		
@@ -373,6 +381,10 @@ int main(int argc, char **argv)
 	ROS_INFO("initialisation: %ld ms", init_time_ms);
 	ROS_INFO("Planning %ld ms", planning_time_ms);
 	ROS_INFO("Movement %ld ms", execution_time_ms);
+
+	int total_points = sucess_points + error_points;
+	float percentage = sucess_points/((float) total_points);
+	ROS_INFO("Sucessfully reached %i viewpoints out of a total: %i", sucess_points, total_points);
 	return 0;
 }
 
