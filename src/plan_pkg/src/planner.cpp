@@ -71,23 +71,35 @@ int main(int argc, char **argv)
 	ros::Duration sleep_time(10.0);
 
 	moveit::planning_interface::MoveGroup group("manipulator");
-	//moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+	
+	ROS_ERROR("program fails next line");
+	moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+
+	ROS_INFO("Reference frame: %s", group.getPlanningFrame().c_str());
+
+	ROS_INFO("End effector frame: %s", group.getEndEffectorLink().c_str());
+	
+	group.setPoseReferenceFrame("base_link");
+
+	group.startStateMonitor();
+  	group.setStartStateToCurrentState();
+  	group.setPlanningTime(12);
 	
 // ---------------- Add collision object(s). -----------------
 	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
-  while(planning_scene_diff_publisher.getNumSubscribers() < 1)
-  {
-    ros::WallDuration sleep_t(0.5);
-    sleep_t.sleep();
+  	while(planning_scene_diff_publisher.getNumSubscribers() < 1)
+  	{
+    		ros::WallDuration sleep_t(0.5);
+   		 sleep_t.sleep();
 	}
 
 	moveit_msgs::CollisionObject table;
 	table.id = "table";
 	shape_msgs::SolidPrimitive primitive;
 	primitive.type = primitive.BOX;
-  primitive.dimensions.resize(3);
-  primitive.dimensions[0] = 1.0;
-  primitive.dimensions[1] = 1.0;
+	primitive.dimensions.resize(3);
+	primitive.dimensions[0] = 1.0;
+	primitive.dimensions[1] = 1.0;
 	primitive.dimensions[2] = 0.1;
 
 	table.primitives.push_back(primitive);
@@ -108,16 +120,16 @@ int main(int argc, char **argv)
 	table.operation = table.ADD;
 
 	moveit_msgs::PlanningScene planning_sc;
-  planning_sc.world.collision_objects.push_back(table);
-  planning_sc.is_diff = true;
-  planning_scene_diff_publisher.publish(planning_sc);
+	planning_sc.world.collision_objects.push_back(table);
+	planning_sc.is_diff = true;
+	planning_scene_diff_publisher.publish(planning_sc);
 	sleep_time.sleep();
 	
 	ros::ServiceClient planning_scene_diff_client = n.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
-  planning_scene_diff_client.waitForExistence();
+	planning_scene_diff_client.waitForExistence();
 // and send the diffs to the planning scene via a service call:
-  moveit_msgs::ApplyPlanningScene srv;
-  srv.request.scene = planning_sc;
+	moveit_msgs::ApplyPlanningScene srv;
+	srv.request.scene = planning_sc;
 	planning_scene_diff_client.call(srv);
 
 // ------------- End adding collision objects. -----------
@@ -125,9 +137,10 @@ int main(int argc, char **argv)
 
 
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fiveByFive_cube.csv");
+	std::ifstream f("/home/magnusms/Documents/git/ur5_simulation/src/plan_pkg/paths/mount_hq_ur5kin.csv");
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
 	if( !f.is_open())
+		ROS_ERROR("failed to open file");
 		return 0;
 	ROS_INFO("file is open");
 	std::string line;	
@@ -165,7 +178,7 @@ int main(int argc, char **argv)
 
 	moveit_msgs::RobotTrajectory trajectory;
 		
-  group.setPlanningTime(1000.0);
+	group.setPlanningTime(1000.0);
 
 	double fraction = group.computeCartesianPath(waypoints,
                                              0.025,  // eef_step
@@ -175,17 +188,17 @@ int main(int argc, char **argv)
 	robot_trajectory::RobotTrajectory rt(group.getCurrentState()->getRobotModel(), "manipulator");
 
   		// Second get a RobotTrajectory from trajectory
-  rt.setRobotTrajectoryMsg(*group.getCurrentState(), trajectory);
+	rt.setRobotTrajectoryMsg(*group.getCurrentState(), trajectory);
  
   		// Thrid create a IterativeParabolicTimeParameterization object
-  trajectory_processing::IterativeParabolicTimeParameterization iptp;
+	trajectory_processing::IterativeParabolicTimeParameterization iptp;
 
   		// Fourth compute computeTimeStamps
-  bool success = iptp.computeTimeStamps(rt);
+	bool success = iptp.computeTimeStamps(rt);
   		//ROS_INFO("Computed time stamp %s",success?"SUCCEDED":"FAILED");
 
   		// Get RobotTrajectory_msg from RobotTrajectory
-  rt.getRobotTrajectoryMsg(trajectory);
+	rt.getRobotTrajectoryMsg(trajectory);
 	ROS_INFO("Path computed: (%.2f%% of pablovo)",
       	fraction * 100.0);
 			
