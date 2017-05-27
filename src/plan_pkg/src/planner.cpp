@@ -72,7 +72,6 @@ int main(int argc, char **argv)
 
 	moveit::planning_interface::MoveGroup group("manipulator");
 	
-	ROS_ERROR("program fails next line");
 	moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
 
 	ROS_INFO("Reference frame: %s", group.getPlanningFrame().c_str());
@@ -82,8 +81,8 @@ int main(int argc, char **argv)
 	group.setPoseReferenceFrame("base_link");
 
 	group.startStateMonitor();
-  	group.setStartStateToCurrentState();
-  	group.setPlanningTime(12);
+  group.setStartStateToCurrentState();
+  group.setPlanningTime(12);
 	
 // ---------------- Add collision object(s). -----------------
 	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
@@ -134,14 +133,12 @@ int main(int argc, char **argv)
 
 // ------------- End adding collision objects. -----------
 
-
-
-
-	std::ifstream f("/home/magnusms/Documents/git/ur5_simulation/src/plan_pkg/paths/mount_hq_ur5kin.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
-	if( !f.is_open())
+	if(!f.is_open()){
 		ROS_ERROR("failed to open file");
 		return 0;
+	}
 	ROS_INFO("file is open");
 	std::string line;	
 	
@@ -178,10 +175,10 @@ int main(int argc, char **argv)
 
 	moveit_msgs::RobotTrajectory trajectory;
 		
-	group.setPlanningTime(1000.0);
+	group.setPlanningTime(10.0);
 
 	double fraction = group.computeCartesianPath(waypoints,
-                                             0.025,  // eef_step
+                                             0.01,  // eef_step
                                              0.0,   // jump_threshold
                                              trajectory);
 			//bool success = group.plan(my_plan);

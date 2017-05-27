@@ -7,54 +7,11 @@
 #include "trac_planner.hpp"
 
 // ROS message types.
-#include <geometry_msgs/Pose.h>
-#include <trajectory_msgs/JointTrajectory.h>
-#include <trajectory_msgs/JointTrajectoryPoint.h>
-#include <cmath>
-
-// ROS and "MoveIt!" packages. Some of these are probably not needed. 
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <moveit/kinematic_constraints/kinematic_constraint.h>
-#include <moveit/kinematic_constraints/utils.h>
-#include <moveit/planning_scene/planning_scene.h>
-#include <moveit/planning_interface/planning_interface.h>
-#include <moveit/move_group_interface/move_group.h>
-#include <moveit/robot_model/robot_model.h>
-#include <moveit_msgs/PlanningScene.h>
-#include <moveit/trajectory_processing/iterative_time_parameterization.h>
-#include <moveit_msgs/AttachedCollisionObject.h>
-#include <moveit_msgs/GetStateValidity.h>
-#include <moveit_msgs/DisplayRobotState.h>
-#include <moveit/kinematics_base/kinematics_base.h>
-#include <pluginlib/class_list_macros.h>
-#include <pluginlib/class_loader.h>
-
-#include <moveit/robot_model_loader/robot_model_loader.h>
-#include <moveit/robot_state/robot_state.h>
-#include <moveit/robot_state/conversions.h>
-
-//Inverse kinematics 
-//#include <descartes_moveit/moveit_state_adapter.h>
-#include <urdf/model.h>
-#include <eigen_conversions/eigen_kdl.h>
-#include <kdl_parser/kdl_parser.hpp>
-#include <tf_conversions/tf_kdl.h>
-#include <ur_kinematics/ur_kin.h>
-
-
-//Planning scene collision objects.
-#include <moveit_msgs/AttachedCollisionObject.h>
-#include <moveit_msgs/GetStateValidity.h>
-#include <moveit_msgs/DisplayRobotState.h>
-#include <moveit_msgs/ApplyPlanningScene.h>
-//#include <actionlib/client/simple_action_client.h>
-#include <sys/time.h>
-
 
 Eigen::Vector3f x_axis(1, 0, 0);
 Eigen::Vector3f y_axis(0, 1, 0);
 Eigen::Vector3f z_axis(0, 0, 1);
-Eigen::Vector3f end_effector_offset(0.045, 0.0, 0.035);
+Eigen::Vector3f end_effector_offset(0.0, 0.035, 0.045);
 /*
 		Main function
 */
@@ -80,10 +37,16 @@ int main(int argc, char **argv)
 /*
 	Load urdf, setup joint model groups and kinematic state. 
 */
+/*
+	collision_detection::World world;
+	shapes::shape table;
+	world.addToObject("table", 
 
+*/
 	robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
 	robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
 	ROS_INFO("Model frame: %s", robot_model->getModelFrame().c_str());
+	
 	planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model));
 	robot_state::RobotStatePtr kinematic_state(new robot_state::RobotState(robot_model));
 	kinematic_state->setToDefaultValues();
@@ -146,64 +109,26 @@ int main(int argc, char **argv)
 
 
 // ----------- Add collision for table. ----------------------
-	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
-	while(planning_scene_diff_publisher.getNumSubscribers() < 1)
-	{
-		ros::WallDuration sleep_t(0.5);
-		sleep_t.sleep();
-	}
-
-	moveit_msgs::CollisionObject table;
-	table.id = "table";
-	shape_msgs::SolidPrimitive primitive;
-	primitive.type = primitive.BOX;
-	primitive.dimensions.resize(3);
-	primitive.dimensions[0] = 1.0;
-	primitive.dimensions[1] = 1.0;
-	primitive.dimensions[2] = 0.1;
-
-	table.primitives.push_back(primitive);
-	
-	table.header.frame_id = "/world";
-
-	geometry_msgs::Pose table_pose;
-	table_pose.position.z = -0.3;
-	table_pose.position.x = 0.2;
-	table_pose.position.y = 0.2;
-	table_pose.orientation.x = 0.0;
-	table_pose.orientation.y = 0.0;
-	table_pose.orientation.z = 0.0;
-	table_pose.orientation.w = 0.0;
-
-	table.primitive_poses.push_back(table_pose);
-
-	table.operation = table.ADD;
 
 	moveit_msgs::PlanningScene planning_sc;
-	planning_sc.world.collision_objects.push_back(table);
+	add_table(planning_sc);
+	add_wall(planning_sc);
 	planning_sc.is_diff = true;
-	planning_scene_diff_publisher.publish(planning_sc);
-	sleep_time.sleep();
-	
-	ros::ServiceClient planning_scene_diff_client = n.serviceClient<moveit_msgs::ApplyPlanningScene>("apply_planning_scene");
-	planning_scene_diff_client.waitForExistence();
-// and send the diffs to the planning scene via a service call:
-	moveit_msgs::ApplyPlanningScene srv;
-	srv.request.scene = planning_sc;
-	planning_scene_diff_client.call(srv);
+	//planning_scene->setPlanningSceneDiffMsg(planning_sc);
 	
 //---------------------------------------------------------------------------------------------------------------
+
 
 	double tolerance_below = 1e-3;
 	double tolerance_above = 1e-3;
 	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
-	req.workspace_parameters.min_corner.z = -0.1;
+	req.workspace_parameters.min_corner.z = -0.25;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.8;
 	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y = req.workspace_parameters.max_corner.z =  0.8;
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fiveByFive_cube.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fbf_cube_hq_ur5kin.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -241,11 +166,15 @@ int main(int argc, char **argv)
 		 
 
 		// calculate ee_offset. 
-  	Eigen::AngleAxisf mroll = Eigen::AngleAxisf(pose[3], x_axis);
+		/*
+  	Eigen::AngleAxisf mroll = Eigen::AngleAxisf(pose[3] + M_PI, x_axis);
 		Eigen::AngleAxisf mpitch = Eigen::AngleAxisf(pose[4],y_axis);
   	Eigen::AngleAxisf myaw = Eigen::AngleAxisf(pose[5], z_axis);
+		*/
+
+		Eigen::Vector3f normal(cos(pose[4])*cos(pose[5]), cos(pose[4])*sin(pose[5]), sin(pose[4]) ); //unit normal.
 		
-		Eigen::Vector3f ee_offset = myaw*(mpitch*(mroll*end_effector_offset));
+		Eigen::Vector3f ee_offset = normal * end_effector_offset[2]; //myaw*(mpitch*(mroll*end_effector_offset));
 		// ---
 	
  		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
@@ -308,6 +237,7 @@ int main(int argc, char **argv)
 						min_distance = dis;			
 						joint_values = valid_solutions[i];
 					}
+					c_res.clear();
 				}
 			}
 
@@ -373,6 +303,8 @@ int main(int argc, char **argv)
 		
 		
 	}
+	//Publish timing.
+	
 	execution_time_ms = execution_time_ms/1000;
 	init_time_ms = execution_time_ms/1000;
 	planning_time_ms = execution_time_ms/1000; 
@@ -389,13 +321,74 @@ int main(int argc, char **argv)
 }
 
 
+//Add the table to the planning scene
+void add_table(moveit_msgs::PlanningScene &ps)
+{
+	moveit_msgs::CollisionObject table;
+	table.id = "table";
+	shape_msgs::SolidPrimitive primitive;
+	primitive.type = primitive.BOX;
+	primitive.dimensions.resize(3);
+	primitive.dimensions[0] = 1.0;
+	primitive.dimensions[1] = 1.0;
+	primitive.dimensions[2] = 0.1;
 
+	table.primitives.push_back(primitive);
+	
+	table.header.frame_id = "world";
 
+	geometry_msgs::Pose table_pose;
+	table_pose.position.z = -0.35;
+	table_pose.position.x = 0.2;
+	table_pose.position.y = 0.2;
+	table_pose.orientation.x = 0.0;
+	table_pose.orientation.y = 0.0;
+	table_pose.orientation.z = 0.0;
+	table_pose.orientation.w = 0.0;
 
+	table.primitive_poses.push_back(table_pose);
+
+	table.operation = table.ADD;
+	ps.world.collision_objects.push_back(table);
+
+}
+
+//Add the wall to the planning scene
+void add_wall(moveit_msgs::PlanningScene &ps)
+{
+	moveit_msgs::CollisionObject wall;
+	wall.id = "table";
+	shape_msgs::SolidPrimitive primitive;
+	primitive.type = primitive.BOX;
+	primitive.dimensions.resize(3);
+	primitive.dimensions[0] = 0.1;
+	primitive.dimensions[1] = 2.0;
+	primitive.dimensions[2] = 1.5;
+
+	wall.primitives.push_back(primitive);
+	
+	wall.header.frame_id = "world";
+
+	geometry_msgs::Pose wall_pose;
+	wall_pose.position.z = 0.0;
+	wall_pose.position.x = - 0.3;
+	wall_pose.position.y = 0.0;
+	wall_pose.orientation.x = 0.0;
+	wall_pose.orientation.y = 0.0;
+	wall_pose.orientation.z = 0.0;
+	wall_pose.orientation.w = 0.0;
+
+	wall.primitive_poses.push_back(wall_pose);
+
+	wall.operation = wall.ADD;
+	ps.world.collision_objects.push_back(wall);
+
+}
 
 
 //Simple help function
-void getPose(std::string s, double* v){
+void getPose(std::string s, double* v)
+{
 	int p = 0;
 	int q = 0;
 	for(int i = 0; i< s.size(); i++){
@@ -411,7 +404,8 @@ void getPose(std::string s, double* v){
 }
 
 //Simpe but maybe unneccesary help function.
-void getTransform(double * pose, double tf[][4]){
+void getTransform(double * pose, double tf[][4])
+{
 	double roll = pose[3];
 	double pitch = pose[4];
 	double yaw = pose[5];
@@ -439,7 +433,8 @@ void getTransform(double * pose, double tf[][4]){
 }
 
 //Stolen from stackoverflow...
-Eigen::Affine3d createRotationMatrix(double ax, double ay, double az){
+Eigen::Affine3d createRotationMatrix(double ax, double ay, double az)
+{
 	Eigen::Affine3d rx =
       Eigen::Affine3d(Eigen::AngleAxisd(ax, Eigen::Vector3d(1, 0, 0)));
   Eigen::Affine3d ry =
@@ -449,12 +444,14 @@ Eigen::Affine3d createRotationMatrix(double ax, double ay, double az){
   return rz * ry * rx;
 }
 
-template <typename T> int sgn(T val) {
+template <typename T> int sgn(T val) 
+{
     return (T(0) < val) - (val < T(0));
 }
 
 //Simple weighted sum. 
-double weightedDistance(std::vector<double> p, std::vector<double> v, double w[6]){
+double weightedDistance(std::vector<double> p, std::vector<double> v, double w[6])
+{
 	if(p.size() != v.size()){
 		ROS_ERROR("Distance between states cannot be found, as states have different dimension");		
 		return -1;
@@ -466,7 +463,8 @@ double weightedDistance(std::vector<double> p, std::vector<double> v, double w[6
 	return std::sqrt(sum); 
 }
 
-void setFromMatrix(Eigen::Matrix4d m, double tf[][4]){
+void setFromMatrix(Eigen::Matrix4d m, double tf[][4])
+{
 	for(int n = 0; n < 4; n++){
 			for(int q = 0; q < 4; q++){
 				tf[n][q] = m(n, q);

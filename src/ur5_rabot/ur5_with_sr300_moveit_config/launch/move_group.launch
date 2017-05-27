@@ -1,6 +1,11 @@
+<?xml version="1.0"?>
 <launch>
 
-  <include file="$(find ur5_with_sr300_moveit_config)/launch/planning_context.launch" />
+	<arg name="limited" default="false"/>
+
+  <include file="$(find ur5_with_sr300_moveit_config)/launch/planning_context.launch" >
+		<arg name="limited" value="$(arg limited)" />
+  </include>
 
   <!-- GDB Debug Option -->
   <arg name="debug" default="false" />
