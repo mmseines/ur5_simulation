@@ -112,9 +112,9 @@ int main(int argc, char **argv)
 
 	moveit_msgs::PlanningScene planning_sc;
 	add_table(planning_sc);
-	add_wall(planning_sc);
+	//add_wall(planning_sc);
 	planning_sc.is_diff = true;
-	//planning_scene->setPlanningSceneDiffMsg(planning_sc);
+	planning_scene->setPlanningSceneDiffMsg(planning_sc);
 	
 //---------------------------------------------------------------------------------------------------------------
 
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/fbf_cube_hq_ur5kin.csv");
+	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/lastPath.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -173,10 +173,12 @@ int main(int argc, char **argv)
 		*/
 
 		Eigen::Vector3f normal(cos(pose[4])*cos(pose[5]), cos(pose[4])*sin(pose[5]), sin(pose[4]) ); //unit normal.
+		Eigen::Vector3f normal2(cos(pose[4] - M_PI/2.0)*cos(pose[5]), cos(pose[4] - M_PI/2.0)*sin(pose[5]), sin(pose[4] - M_PI/2.0) );
 		
-		Eigen::Vector3f ee_offset = normal * end_effector_offset[2]; //myaw*(mpitch*(mroll*end_effector_offset));
+		Eigen::Vector3f ee_offset = normal * end_effector_offset[2] + normal2 * end_effector_offset[1]; //myaw*(mpitch*(mroll*end_effector_offset));
+		ROS_ERROR("ee_offset is calculated to be of length: %f", ee_offset.norm());	
 		// ---
-	
+		
  		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
 		Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0]-ee_offset[0],pose[1]- ee_offset[1],pose[2] - ee_offset[2])));
 		Eigen::Matrix4d m = (t * r).matrix();	
@@ -338,8 +340,8 @@ void add_table(moveit_msgs::PlanningScene &ps)
 	table.header.frame_id = "world";
 
 	geometry_msgs::Pose table_pose;
-	table_pose.position.z = -0.35;
-	table_pose.position.x = 0.2;
+	table_pose.position.z = -0.33;
+	table_pose.position.x = -0.2;
 	table_pose.position.y = 0.2;
 	table_pose.orientation.x = 0.0;
 	table_pose.orientation.y = 0.0;
@@ -371,12 +373,14 @@ void add_wall(moveit_msgs::PlanningScene &ps)
 
 	geometry_msgs::Pose wall_pose;
 	wall_pose.position.z = 0.0;
-	wall_pose.position.x = - 0.3;
-	wall_pose.position.y = 0.0;
-	wall_pose.orientation.x = 0.0;
-	wall_pose.orientation.y = 0.0;
-	wall_pose.orientation.z = 0.0;
-	wall_pose.orientation.w = 0.0;
+	wall_pose.position.x = 0.0;
+	wall_pose.position.y = -0.3;
+
+	tf::Quaternion q = tf::createQuaternionFromRPY(0.0, 0.0,-M_PI/4.0);
+	wall_pose.orientation.x = q.x();
+	wall_pose.orientation.y = q.y();
+	wall_pose.orientation.z = q.z();
+	wall_pose.orientation.w = q.w();
 
 	wall.primitive_poses.push_back(wall_pose);
 

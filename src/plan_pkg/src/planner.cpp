@@ -43,6 +43,8 @@
 #include <moveit_msgs/DisplayRobotState.h>
 #include <moveit_msgs/ApplyPlanningScene.h>
 
+#include "ikplanner.hpp"
+
 void getPose(std::string s, double* v){
 	int p = 0;
 	int q = 0;
