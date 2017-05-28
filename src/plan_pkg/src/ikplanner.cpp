@@ -103,6 +103,7 @@ int main(int argc, char **argv)
 	planning_interface::MotionPlanRequest req;
 	req.group_name = "manipulator";
 	req.planner_id = "manipulator";
+	req.allowed_planning_time = 2.5;
 	planning_interface::MotionPlanResponse res;
 	moveit_msgs::MotionPlanResponse response;
 /* Specify bounds on the workspace */
@@ -111,8 +112,9 @@ int main(int argc, char **argv)
 // ----------- Add collision for table. ----------------------
 
 	moveit_msgs::PlanningScene planning_sc;
-	add_table(planning_sc);
+	//add_table(planning_sc);
 	//add_wall(planning_sc);
+	add_mount(planning_sc);
 	planning_sc.is_diff = true;
 	planning_scene->setPlanningSceneDiffMsg(planning_sc);
 	
@@ -124,11 +126,12 @@ int main(int argc, char **argv)
 	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
 	req.workspace_parameters.min_corner.z = -0.25;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.8;
-	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y = req.workspace_parameters.max_corner.z =  0.8;
+	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y =  0.25;
+	req.workspace_parameters.max_corner.z = 0.8;
 
 	/* Open and terate through path composed of several pose targets */	
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/lastPath.csv");
+	std::ifstream f(ros::package::getPath("plan_pkg")+"/paths/lastPath.csv");
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -175,8 +178,7 @@ int main(int argc, char **argv)
 		Eigen::Vector3f normal(cos(pose[4])*cos(pose[5]), cos(pose[4])*sin(pose[5]), sin(pose[4]) ); //unit normal.
 		Eigen::Vector3f normal2(cos(pose[4] - M_PI/2.0)*cos(pose[5]), cos(pose[4] - M_PI/2.0)*sin(pose[5]), sin(pose[4] - M_PI/2.0) );
 		
-		Eigen::Vector3f ee_offset = normal * end_effector_offset[2] + normal2 * end_effector_offset[1]; //myaw*(mpitch*(mroll*end_effector_offset));
-		ROS_ERROR("ee_offset is calculated to be of length: %f", ee_offset.norm());	
+		Eigen::Vector3f ee_offset(0.0,0.0, 0.0); //= normal * end_effector_offset[2] + normal2 * end_effector_offset[1]; //myaw*(mpitch*(mroll*end_effector_offset));	
 		// ---
 		
  		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
@@ -227,13 +229,14 @@ int main(int argc, char **argv)
 			collision_detection::CollisionResult c_res;			
 			joint_values.clear();			//Incase there are no solutions without self collision.
 
+			//minimum distance collision free joint configuration.
 			double min_distance = FLT_MAX;		
 			for(int i = 0; i < valid_solutions.size(); i++) {
 				double dis = weightedDistance(curr_joint_states, valid_solutions[i], weights);									
 				
 				if( dis < min_distance){
 					blah.setJointGroupPositions(joint_model_group, valid_solutions[i]);
-					planning_scene->checkSelfCollision(c_req, c_res, blah);	
+					planning_scene->checkCollision(c_req, c_res, blah);	
 			
 					if(!c_res.collision){
 						min_distance = dis;			
@@ -253,17 +256,17 @@ int main(int argc, char **argv)
 			//Define goals etc.
 			robot_state::RobotState goal_state(robot_model);
 			goal_state.setJointGroupPositions(joint_model_group, joint_values);
-  		moveit_msgs::Constraints joint_goal = kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group, tolerance_below, tolerance_above);
-  		req.goal_constraints.clear();
+			moveit_msgs::Constraints joint_goal = kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group, tolerance_below, tolerance_above);
+			req.goal_constraints.clear();
 			req.goal_constraints.push_back(joint_goal);				
 
 			/* Call the Planner */
 			planning_interface::PlanningContextPtr context = planner_instance->getPlanningContext(planning_scene, req, res.error_code_);
-  		context->solve(res);
+			context->solve(res);
 
-  		if(res.error_code_.val != res.error_code_.SUCCESS)
-  		{
-   			ROS_ERROR("Could not compute plan sucsessfully for wp: %i", count );
+  			if(res.error_code_.val != res.error_code_.SUCCESS)
+  			{
+   				ROS_ERROR("Could not compute plan sucsessfully for wp: %i", count );
 				error_points++;
 				//return 0;
 			}else{
@@ -275,10 +278,10 @@ int main(int argc, char **argv)
 				
 				// Using suggested fix to solve time parameterization of the proposed trajectory 
 				robot_trajectory::RobotTrajectory rt(group.getCurrentState()->getRobotModel(), "manipulator");
-  			rt.setRobotTrajectoryMsg(*group.getCurrentState(), trajectory);
-  			trajectory_processing::IterativeParabolicTimeParameterization iptp;
-  			bool success = iptp.computeTimeStamps(rt);
-  			rt.getRobotTrajectoryMsg(trajectory);
+				rt.setRobotTrajectoryMsg(*group.getCurrentState(), trajectory);
+				trajectory_processing::IterativeParabolicTimeParameterization iptp;
+				bool success = iptp.computeTimeStamps(rt);
+				rt.getRobotTrajectoryMsg(trajectory);
 				
 				//Finaly have a properly parametarized trajectory. 
 				plan.start_state_ = response.trajectory_start;			
@@ -289,11 +292,17 @@ int main(int argc, char **argv)
 
 				gettimeofday(&start_t, NULL);
 				//And this works somehow.
-				group.execute(plan); //is this blocking? if not then how to time it?
-				
+				moveit_msgs::MoveItErrorCodes err = group.execute(plan); //is this blocking? if not then how to time it?
+				if( err.val != moveit_msgs::MoveItErrorCodes::SUCCESS ){
+					ROS_ERROR("error executing path");
+				}
+
 				gettimeofday(&stop_t, NULL);
 				execution_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
 				sucess_points++;
+
+				ros::WallDuration sleep_t(3.0);
+   				sleep_t.sleep();
 			}
 
 
@@ -333,7 +342,7 @@ void add_table(moveit_msgs::PlanningScene &ps)
 	primitive.dimensions.resize(3);
 	primitive.dimensions[0] = 1.0;
 	primitive.dimensions[1] = 1.0;
-	primitive.dimensions[2] = 0.1;
+	primitive.dimensions[2] = 0.2;
 
 	table.primitives.push_back(primitive);
 	
@@ -342,7 +351,7 @@ void add_table(moveit_msgs::PlanningScene &ps)
 	geometry_msgs::Pose table_pose;
 	table_pose.position.z = -0.33;
 	table_pose.position.x = -0.2;
-	table_pose.position.y = 0.2;
+	table_pose.position.y = 0.0;
 	table_pose.orientation.x = 0.0;
 	table_pose.orientation.y = 0.0;
 	table_pose.orientation.z = 0.0;
@@ -359,7 +368,7 @@ void add_table(moveit_msgs::PlanningScene &ps)
 void add_wall(moveit_msgs::PlanningScene &ps)
 {
 	moveit_msgs::CollisionObject wall;
-	wall.id = "table";
+	wall.id = "wall";
 	shape_msgs::SolidPrimitive primitive;
 	primitive.type = primitive.BOX;
 	primitive.dimensions.resize(3);
@@ -372,9 +381,42 @@ void add_wall(moveit_msgs::PlanningScene &ps)
 	wall.header.frame_id = "world";
 
 	geometry_msgs::Pose wall_pose;
-	wall_pose.position.z = 0.0;
 	wall_pose.position.x = 0.0;
-	wall_pose.position.y = -0.3;
+	wall_pose.position.y = -0.4;
+	wall_pose.position.z = 0.0;
+
+	tf::Quaternion q = tf::createQuaternionFromRPY(0.0, 0.0, -M_PI/4.0);
+	wall_pose.orientation.x = q.x();
+	wall_pose.orientation.y = q.y();
+	wall_pose.orientation.z = q.z();
+	wall_pose.orientation.w = q.w();
+
+	wall.primitive_poses.push_back(wall_pose);
+
+	wall.operation = wall.ADD;
+	ps.world.collision_objects.push_back(wall);
+
+}
+
+void add_mount(moveit_msgs::PlanningScene &ps)
+{
+	moveit_msgs::CollisionObject wall;
+	wall.id = "mount";
+	shape_msgs::SolidPrimitive primitive;
+	primitive.type = primitive.BOX;
+	primitive.dimensions.resize(3);
+	primitive.dimensions[0] = 0.15;
+	primitive.dimensions[1] = 0.15;
+	primitive.dimensions[2] = 1.0;
+
+	wall.primitives.push_back(primitive);
+	
+	wall.header.frame_id = "world";
+
+	geometry_msgs::Pose wall_pose;
+	wall_pose.position.x = 0.0;
+	wall_pose.position.y = 0.0;
+	wall_pose.position.z = -0.52;
 
 	tf::Quaternion q = tf::createQuaternionFromRPY(0.0, 0.0,-M_PI/4.0);
 	wall_pose.orientation.x = q.x();
@@ -388,6 +430,7 @@ void add_wall(moveit_msgs::PlanningScene &ps)
 	ps.world.collision_objects.push_back(wall);
 
 }
+
 
 
 //Simple help function
@@ -462,6 +505,7 @@ double weightedDistance(std::vector<double> p, std::vector<double> v, double w[6
 	}
 	double sum = 0.0;
 	for(int i = 0; i< p.size(); i++){
+		
 		sum += std::pow(p[i] - v[i], 2)*w[i];
 	}
 	return std::sqrt(sum); 

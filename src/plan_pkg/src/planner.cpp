@@ -83,15 +83,15 @@ int main(int argc, char **argv)
 	group.setPoseReferenceFrame("base_link");
 
 	group.startStateMonitor();
-  group.setStartStateToCurrentState();
-  group.setPlanningTime(12);
+  	group.setStartStateToCurrentState();
+  	group.setPlanningTime(12);
 	
 // ---------------- Add collision object(s). -----------------
 	ros::Publisher planning_scene_diff_publisher = n.advertise<moveit_msgs::PlanningScene>("planning_scene", 1);
   	while(planning_scene_diff_publisher.getNumSubscribers() < 1)
   	{
-    		ros::WallDuration sleep_t(0.5);
-   		 sleep_t.sleep();
+    	ros::WallDuration sleep_t(0.5);
+   		sleep_t.sleep();
 	}
 
 	moveit_msgs::CollisionObject table;
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
 
 // ------------- End adding collision objects. -----------
 
-	std::ifstream f("/home/magnus/Documents/path_ctrl/src/plan_pkg/paths/latestPath.csv");
+	std::ifstream f(ros::package::getPath("plan_pkg")+"/paths/lastPath.csv");
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
 	if(!f.is_open()){
 		ROS_ERROR("failed to open file");
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
 	group.setPlanningTime(10.0);
 
 	double fraction = group.computeCartesianPath(waypoints,
-                                             0.01,  // eef_step
+                                             0.04,  // eef_step
                                              0.0,   // jump_threshold
                                              trajectory);
 			//bool success = group.plan(my_plan);

@@ -102,5 +102,7 @@ void add_table(moveit_msgs::PlanningScene &ps);
 
 void add_wall(moveit_msgs::PlanningScene &ps);
 
+void add_mount(moveit_msgs::PlanningScene &ps);
+
 
 #endif
