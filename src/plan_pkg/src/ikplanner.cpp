@@ -37,12 +37,7 @@ int main(int argc, char **argv)
 /*
 	Load urdf, setup joint model groups and kinematic state. 
 */
-/*
-	collision_detection::World world;
-	shapes::shape table;
-	world.addToObject("table", 
 
-*/
 	robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
 	robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
 	ROS_INFO("Model frame: %s", robot_model->getModelFrame().c_str());
@@ -112,11 +107,11 @@ int main(int argc, char **argv)
 // ----------- Add collision for table. ----------------------
 
 	moveit_msgs::PlanningScene planning_sc;
-	//add_table(planning_sc);
-	//add_wall(planning_sc);
+	add_table(planning_sc);
+	add_wall(planning_sc);
 	add_mount(planning_sc);
 	planning_sc.is_diff = true;
-	planning_scene->setPlanningSceneDiffMsg(planning_sc);
+	//planning_scene->setPlanningSceneDiffMsg(planning_sc);
 	
 //---------------------------------------------------------------------------------------------------------------
 
@@ -301,8 +296,8 @@ int main(int argc, char **argv)
 				execution_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
 				sucess_points++;
 
-				ros::WallDuration sleep_t(3.0);
-   				sleep_t.sleep();
+				//ros::WallDuration sleep_t(3.0);
+   				//sleep_t.sleep();
 			}
 
 

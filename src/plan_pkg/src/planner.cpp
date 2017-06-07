@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 
 	ROS_INFO("End effector frame: %s", group.getEndEffectorLink().c_str());
 	
-	group.setPoseReferenceFrame("base_link");
+	group.setPoseReferenceFrame("world");
 
 	group.startStateMonitor();
   	group.setStartStateToCurrentState();

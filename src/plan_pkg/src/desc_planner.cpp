@@ -134,22 +134,31 @@ int main(int argc, char** argv)
 	poses.push_back(startPose);
 	poses.push_back(endPose);
 	
-  poses = tutorial_utilities::line(startPose, endPose, N_points);
+  Eigen::Vector3d translation_vector = endPose.translation() - startPose.translation();
+  Eigen::Vector3d step_vector = translation_vector/(N_points + 1);
+  Eigen::Translation<double,3> tranpants(step_vector);
 
-	ROS_INFO("looking for error 1");
+  for(int i = 0; i < (N_points); ++i)
+  {
+    poses.push_back(tranpants * poses.back());
+  }
+
+  //poses = tutorial_utilities::line(startPose, endPose, N_points);
+
+	
   for (unsigned int i = 0; i < N_points; ++i)
   {
     descartes_core::TrajectoryPtPtr pt = makeTolerancedCartesianPoint(poses[i], 0.0, 0.4, M_PI);
     points.push_back(pt);
   }
-	ROS_INFO("looking for error 2");
+	
   // Visualize the trajectory points in RViz
   // Transform the generated poses into a markerArray message that can be visualized by RViz
   visualization_msgs::MarkerArray ma;
   ma = tutorial_utilities::createMarkerArray(poses);
   // Start the publisher for the Rviz Markers
   ros::Publisher vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "visualization_marker_array", 1 );
-	ROS_INFO("looking for error 3");
+	
   // Wait for subscriber and publish the markerArray once the subscriber is found.
   ROS_INFO("Waiting for marker subscribers.");
   if(waitForSubscribers(vis_pub, ros::Duration(2.0)))
@@ -180,7 +189,7 @@ int main(int argc, char** argv)
 
   // tool center point frame (name of link associated with tool)
   // this is also updated in the launch file of the robot
-  const std::string tcp_frame = "ee_link";
+  const std::string tcp_frame = "tool_tip";
 
   if (!model->initialize(robot_description, group_name, world_frame, tcp_frame))
   {

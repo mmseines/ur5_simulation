@@ -19,4 +19,33 @@
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
   </joint>
 
+	<link name="sensor"> 
+ 	<visual> 
+    <origin xyz="0.045 0.0 0.035" rpy="0 0.0 0.0" /> 
+  	<geometry> 
+      <box size="0.03 0.12 0.03"/>
+     </geometry> 
+     <material name="Grey" />
+ </visual> 
+ <collision> 
+    <origin xyz="0.045 0.0 0.35" rpy="0 0 0" /> 
+    <geometry> 
+      <box size="0.03 0.12 0.03"/>
+    </geometry> 
+ </collision> 
+	</link>
+
+<link name="tool_tip" />
+
+<joint name="tool_to_sensor" type="fixed">
+  <parent link="ee_link"/>
+  <child link="sensor"/>
+</joint>
+
+<joint name="sensor_to_tip" type="fixed">
+  <parent link="sensor"/>
+  <child link="tool_tip"/>
+  <origin xyz="0.0 0.0 0.01" rpy="0 0.0 0" />
+</joint>
+
 </robot>
