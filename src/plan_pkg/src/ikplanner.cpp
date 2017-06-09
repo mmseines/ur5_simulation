@@ -18,7 +18,7 @@ Eigen::Vector3f end_effector_offset(0.0, 0.035, 0.045);
 int main(int argc, char **argv)
 {
 
-	ros::init(argc, argv, "path_sism");
+	ros::init(argc, argv, "path_sim");
 	ros::NodeHandle n;	
 	ros::AsyncSpinner spinner(1);
 	spinner.start();
@@ -121,12 +121,17 @@ int main(int argc, char **argv)
 	double scale = 100; //Viewpoint planning done in cm for visibility (in both model editors and rviz), but ros operates with m.
 	req.workspace_parameters.min_corner.z = -0.25;
 	req.workspace_parameters.min_corner.x = req.workspace_parameters.min_corner.y = -0.8;
-	req.workspace_parameters.max_corner.x = req.workspace_parameters.max_corner.y =  0.25;
+	req.workspace_parameters.max_corner.x = 0.25;
+	req.workspace_parameters.max_corner.y =  0.8;
 	req.workspace_parameters.max_corner.z = 0.8;
 
-	/* Open and terate through path composed of several pose targets */	
-
-	std::ifstream f(ros::package::getPath("plan_pkg")+"/paths/lastPath.csv");
+	/* Open and terate through path composed of several pose targets */
+	std::string path_name;	
+	if(!n.getParam("path_sim/path", path_name)){
+		ROS_ERROR("Error reading argument");
+		path_name = "Augmented.csv";
+	}
+	std::ifstream f(ros::package::getPath("plan_pkg")+"/paths/"+ path_name);
 	if( !f.is_open()){
 		ROS_ERROR("Could not open path, exiting.."); 
 		return 0;
@@ -148,11 +153,15 @@ int main(int argc, char **argv)
 
 	while(std::getline(f, line) && ros::ok())
 	{	
-		count++;
-		if(!std::getline(f,line)){
-			count++;
-			break;
+		if(count != 0){
+			if(!std::getline(f,line))
+			{
+				count++;
+				break;
+			}
 		}
+		
+		count++;
 		gettimeofday(&start_t, NULL);
 
 		double pose [6];
@@ -173,7 +182,7 @@ int main(int argc, char **argv)
 		Eigen::Vector3f normal(cos(pose[4])*cos(pose[5]), cos(pose[4])*sin(pose[5]), sin(pose[4]) ); //unit normal.
 		Eigen::Vector3f normal2(cos(pose[4] - M_PI/2.0)*cos(pose[5]), cos(pose[4] - M_PI/2.0)*sin(pose[5]), sin(pose[4] - M_PI/2.0) );
 		
-		Eigen::Vector3f ee_offset(0.0,0.0, 0.0); //= normal * end_effector_offset[2] + normal2 * end_effector_offset[1]; //myaw*(mpitch*(mroll*end_effector_offset));	
+		Eigen::Vector3f ee_offset = normal * end_effector_offset[2] + normal2 * end_effector_offset[1]; //myaw*(mpitch*(mroll*end_effector_offset));	
 		// ---
 		
  		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
@@ -183,7 +192,7 @@ int main(int argc, char **argv)
 
 		double q_ik_sols[8][6];
 		std::vector< std::vector<double> > valid_solutions;
-		double weights[6] = {8.0, 4.0, 1.0 ,0.2, 0.2, 2.0};
+		double weights[6] = {8.0, 4.0, 2.0 ,1.0, 0.2, 2.0};
 
 		//Compute inverse kinematics and check them to be within joint limits -pi to pi
 		int num_sols = ur_kinematics::inverse((double*) tf_matrix,(double*) q_ik_sols, 0.0f);  
@@ -192,18 +201,18 @@ int main(int argc, char **argv)
 			for(int q = 0; q < 6; q++){
 				if (q_ik_sols[i][q] != q_ik_sols[i][q] || !std::isfinite(q_ik_sols[i][q]) ){ //Check for nan / inf
 					break;				
-				}else if(i == 5){
-						//do nothing.
-				}else if( fabs(q_ik_sols[i][q]) <= M_PI ){
+				}else if( fabs(q_ik_sols[i][q]) <= M_PI){
 						val_sol.push_back(q_ik_sols[i][q]);
 				}else if( q_ik_sols[i][q] + 2*M_PI <= M_PI || q_ik_sols[i][q] - 2*M_PI >= -M_PI){
 						val_sol.push_back(q_ik_sols[i][q] - sgn(q_ik_sols[i][q])*2*M_PI);
 				}else{
+					//val_sol.push_back(q_ik_sols[i][q]);
 					ROS_ERROR("WUT? %0.2f", q_ik_sols[i][q]);
 					break;
-				}  
+				} 
+				 
 			}
-			if(val_sol.size() == 6 && (val_sol[1] > -3.1 && val_sol[1]< 0.04)){ // could be stricter, avoiding configurations where the lift joint is bent downward.
+			if(val_sol.size() == 6 && (val_sol[1] >= -3.14 && val_sol[1] <= 0.00)){ // could be stricter, avoiding configurations where the lift joint is bent downward.
 					valid_solutions.push_back(val_sol);
 			}
 			val_sol.clear();  				
