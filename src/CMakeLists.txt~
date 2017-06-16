@@ -112,6 +112,7 @@ find_package(catkin REQUIRED COMPONENTS
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+	plan_pkg/include
 )
 
 ## Declare a cpp library
@@ -121,10 +122,11 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(sim 
-	plan_pkg/planner.cpp	
+	src/planner.cpp	
 )
 add_executable(ikSim 
-	plan_pkg/ikplanner.cpp
+	src/ikplanner.cpp
+	src/ur_kin.cpp
 )
 
 

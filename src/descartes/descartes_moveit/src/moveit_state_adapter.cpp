@@ -137,6 +137,12 @@ bool MoveitStateAdapter::initialize(robot_model::RobotModelConstPtr robot_model,
   return true;
 }
 
+/*
+	for all IK solutions here.. try to iterate all solutions and set them to be between -pi and pi.
+
+
+*/
+
 bool MoveitStateAdapter::getIK(const Eigen::Affine3d& pose, const std::vector<double>& seed_state,
                                std::vector<double>& joint_pose) const
 {
@@ -156,6 +162,14 @@ bool MoveitStateAdapter::getIK(const Eigen::Affine3d& pose, std::vector<double>&
     robot_state_->copyJointGroupPositions(group_name_, joint_pose);
     if (!isValid(joint_pose))
     {
+			for(int i = 0; i < joint_pose.size() ; i++)
+			{
+				if(joint_pose[i] > M_PI){
+					joint_pose[i] -= 2*M_PI;
+				}else if(joint_pose[i] < -M_PI){
+					joint_pose[i] += 2*M_PI;
+				}
+			}
       ROS_DEBUG_STREAM("Robot joint pose is invalid");
     }
     else

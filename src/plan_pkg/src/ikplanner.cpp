@@ -11,7 +11,7 @@
 Eigen::Vector3f x_axis(1, 0, 0);
 Eigen::Vector3f y_axis(0, 1, 0);
 Eigen::Vector3f z_axis(0, 0, 1);
-Eigen::Vector3f end_effector_offset(0.0, 0.035, 0.045);
+Eigen::Vector3d end_effector_offset(0.045, 0.0, 0.035);
 /*
 		Main function
 */
@@ -174,19 +174,19 @@ int main(int argc, char **argv)
 
 		// calculate ee_offset. 
 		/*
-  	Eigen::AngleAxisf mroll = Eigen::AngleAxisf(pose[3] + M_PI, x_axis);
+  		Eigen::AngleAxisf mroll = Eigen::AngleAxisf(pose[3] + M_PI, x_axis);
 		Eigen::AngleAxisf mpitch = Eigen::AngleAxisf(pose[4],y_axis);
-  	Eigen::AngleAxisf myaw = Eigen::AngleAxisf(pose[5], z_axis);
+  		Eigen::AngleAxisf myaw = Eigen::AngleAxisf(pose[5], z_axis);
 		*/
 
-		Eigen::Vector3f normal(cos(pose[4])*cos(pose[5]), cos(pose[4])*sin(pose[5]), sin(pose[4]) ); //unit normal.
-		Eigen::Vector3f normal2(cos(pose[4] - M_PI/2.0)*cos(pose[5]), cos(pose[4] - M_PI/2.0)*sin(pose[5]), sin(pose[4] - M_PI/2.0) );
+		Eigen::Affine3d ee_rot = createRotationMatrix(pose[3], pose[4], pose[5]);
+
 		
-		Eigen::Vector3f ee_offset = normal * end_effector_offset[2] + normal2 * end_effector_offset[1]; //myaw*(mpitch*(mroll*end_effector_offset));	
+		Eigen::Vector3d ee_offset = ee_rot.rotation()*end_effector_offset; //myaw*(mpitch*(mroll*end_effector_offset));	
 		// ---
 		
  		Eigen::Affine3d r = createRotationMatrix(pose[3], pose[4], pose[5]);
-		Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0]-ee_offset[0],pose[1]- ee_offset[1],pose[2] - ee_offset[2])));
+		Eigen::Affine3d t(Eigen::Translation3d(Eigen::Vector3d(pose[0]-ee_offset[0],pose[1]-ee_offset[1],pose[2]-ee_offset[2])));
 		Eigen::Matrix4d m = (t * r).matrix();	
 		setFromMatrix(m, tf_matrix);
 
@@ -259,7 +259,16 @@ int main(int argc, char **argv)
 
 			//Define goals etc.
 			robot_state::RobotState goal_state(robot_model);
+
 			goal_state.setJointGroupPositions(joint_model_group, joint_values);
+
+			//const Eigen::Affine3d &end_effector_state = goal_state.getGlobalLinkTransform("tool_tip");
+			
+			//ROS_INFO_STREAM("FK says translation is: \n " << end_effector_state.translation());
+			//ROS_INFO_STREAM("When it is actually: \n" << pose[0] << " " << pose[1] << " " << pose[2] << "\n");
+			
+			//ROS_INFO_STREAM("Joint states should be: \n" << joint_values[0] << "\n"<< joint_values[1] << "\n"<< joint_values[2] << "\n"<< joint_values[3] << "\n"<< joint_values[4] << "\n"<< joint_values[5] << "\n");
+
 			moveit_msgs::Constraints joint_goal = kinematic_constraints::constructGoalConstraints(goal_state, joint_model_group, tolerance_below, tolerance_above);
 			req.goal_constraints.clear();
 			req.goal_constraints.push_back(joint_goal);				
@@ -305,6 +314,7 @@ int main(int argc, char **argv)
 				execution_time_ms += (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
 				sucess_points++;
 
+
 				//ros::WallDuration sleep_t(3.0);
    				//sleep_t.sleep();
 			}
@@ -321,8 +331,8 @@ int main(int argc, char **argv)
 	//Publish timing.
 	
 	execution_time_ms = execution_time_ms/1000;
-	init_time_ms = execution_time_ms/1000;
-	planning_time_ms = execution_time_ms/1000; 
+	init_time_ms = init_time_ms/1000;
+	planning_time_ms = planning_time_ms/1000; 
 	long total_time = execution_time_ms + init_time_ms + planning_time_ms;
 	ROS_INFO("total time spent %ld ms", total_time);
 	ROS_INFO("initialisation: %ld ms", init_time_ms);

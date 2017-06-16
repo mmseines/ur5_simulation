@@ -2,6 +2,9 @@ README
 
 Work in progress...
 
+Derped it up with filestructure in the start. As the only thing you need is to add the contents of the src folder to your catkin workspace...
+
+
 Attempt at simulating an automaticly generated inspection path using a Intel Realsense sr300 device to observe an object. 
 
 

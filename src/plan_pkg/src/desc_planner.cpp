@@ -108,23 +108,23 @@ int main(int argc, char** argv)
     ROS_ERROR("No subscribers connected, collision object not added");
   }
   // 1. Define sequence of points
-	//35.698,17.7734,16.8147,0,0.429204,2.65841
-	//370842,199594,157,0,0.429204,3.05841	
+//	-35.004,33.2815,0.0174641,0,1.57,0
+//-34.2182,34.3232,0.0177266,0,1.57,0
 
   double x, y, z, rx, ry, rz;
-  x = 0.35698;
-  y = 0.177734;
-  z = 0.168147;
-  rx = 0.0;
-  ry = 0.429204;
-  rz = 2.65841;
+  x = -35.004/100;
+  y = 33.2815/100;
+  z = 0.0174641/100;
+  rx = 0;
+  ry = 1.57;
+  rz = 0;
   TrajectoryVec points;
   int N_points = 6;
 	
-	double x2 = 0.370842;
-	double y2 = 0.199594;
-	double z2 = 0.157;
-	double rz2 = 3.05841;
+	double x2 =  -34.2182/100;
+	double y2 = 34.3232/100;
+	double z2 = 0.0177266/100;
+	double rz2 = 0;
 
   std::vector<Eigen::Affine3d> poses;
   Eigen::Affine3d startPose;
@@ -189,7 +189,7 @@ int main(int argc, char** argv)
 
   // tool center point frame (name of link associated with tool)
   // this is also updated in the launch file of the robot
-  const std::string tcp_frame = "tool_tip";
+  const std::string tcp_frame = "sensor";
 
   if (!model->initialize(robot_description, group_name, world_frame, tcp_frame))
   {

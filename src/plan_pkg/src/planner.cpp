@@ -80,6 +80,17 @@ int main(int argc, char **argv)
 
 	ROS_INFO("End effector frame: %s", group.getEndEffectorLink().c_str());
 	
+	int eef_step;
+	if(!n.getParam("path_sim/eef_step", eef_step)){
+		ROS_ERROR("Error reading argument");
+		eef_step = 0.01;
+	}
+	int jump_threshold;
+	if(!n.getParam("path_sim/jt", jump_threshold)){
+		ROS_ERROR("Error reading argument");
+		jump_threshold = 0.0;
+	}
+
 	group.setPoseReferenceFrame("world");
 
 	group.startStateMonitor();
@@ -134,8 +145,12 @@ int main(int argc, char **argv)
 	planning_scene_diff_client.call(srv);
 
 // ------------- End adding collision objects. -----------
-
-	std::ifstream f(ros::package::getPath("plan_pkg")+"/paths/lastPath.csv");
+	std::string path_name;	
+	if(!n.getParam("path_sim/path", path_name)){
+		ROS_ERROR("Error reading argument");
+		path_name = "Augmented.csv";
+	}
+	std::ifstream f(ros::package::getPath("plan_pkg")+"/paths/"+ path_name);
 	//f.open(ros::package::find(plan_pkg)+"/paths/path.csv"); //ros::package::find(plan_pkg)
 	if(!f.is_open()){
 		ROS_ERROR("failed to open file");
@@ -149,6 +164,8 @@ int main(int argc, char **argv)
 	double scale = 100;
 
 	int count  = -1;
+
+
 	while(std::getline(f, line))
 	{	
 		count++;
@@ -169,6 +186,7 @@ int main(int argc, char **argv)
 		pose1.position.z = pose[2]/scale;
 		ROS_INFO("Adding waypoint x,y,z =  [%.2f, %0.2f, %0.2f]" ,pose1.position.x, pose1.position.y, pose1.position.z); 
 		
+
 		if(count % 2 == 0)
 		{
 			waypoints.push_back(pose1);
@@ -180,8 +198,8 @@ int main(int argc, char **argv)
 	group.setPlanningTime(10.0);
 
 	double fraction = group.computeCartesianPath(waypoints,
-                                             0.04,  // eef_step
-                                             0.0,   // jump_threshold
+                                             eef_step,  // eef_step
+                                             jump_threshold,   // jump_threshold
                                              trajectory);
 			//bool success = group.plan(my_plan);
 	robot_trajectory::RobotTrajectory rt(group.getCurrentState()->getRobotModel(), "manipulator");

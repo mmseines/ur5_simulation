@@ -11,7 +11,6 @@
   <build_depend>rospy</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>roslib</build_depend>
-	<build_depend>moveit</build_depend>
 	<build_depend>move_group</build_depend>
   <run_depend>rospy</run_depend>
   <run_depend>roscpp</run_depend>
@@ -20,5 +19,6 @@
 	<run_depend>move_group</run_depend>
 
   <export>
+		
   </export>
 </package>

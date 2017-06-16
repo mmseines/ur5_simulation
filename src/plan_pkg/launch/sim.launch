@@ -5,6 +5,6 @@
   <param name="ikfast_base_frame" type="string" value="base_link" />
   <param name="ikfast_tool_frame" type="string" value="sensor" />
 
-  <include file="$(find ur5_with_sr300_moveit_config)/launch/descartes_pathplanning.launch"></include>
+  <include file="$(find kr120_with_torch_moveit_config)/launch/descartes_pathplanning.launch"></include>
 
 </launch>

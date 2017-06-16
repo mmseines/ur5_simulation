@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- The planning and execution components of MoveIt! configured to run -->
+  <!-- using the ROS-Industrial interface. -->
+ 
+  <!-- Non-standard joint names:
+       - Create a file [robot_moveit_config]/config/joint_names.yaml
+           controller_joint_names: [joint_1, joint_2, ... joint_N] 
+       - Update with joint names for your robot (in order expected by rbt controller)
+       - and uncomment the following line: -->
+  <rosparam command="load" file="$(find ur5_with_sr300_moveit_config)/config/joint_names.yaml"/>
+ 
+  <!-- the "sim" argument controls whether we connect to a Simulated or Real robot -->
+  <!--  - if sim=false, a robot_ip and controller(fs100|dx100) arguments is required -->
+  <arg name="sim" default="true" />
+  <arg name="robot_ip" unless="$(arg sim)" />
+  <arg name="controller" unless="$(arg sim)" />
+ 
+  <!-- load the robot_description parameter before launching ROS-I nodes -->
+  <include file="$(find ur5_with_sr300_moveit_config)/launch/ur5_moveit_planning_execution.launch" >
+    <arg name="sim" value="true" />
+		<arg name="limited" value="true" />
+  </include>
+
+  <include file="$(find ur5_with_sr300_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="config" value="true"/>
+  </include>
+  
+  <include file="$(find ur5_with_sr300_moveit_config)/launch/default_warehouse_db.launch" />
+
+</launch>

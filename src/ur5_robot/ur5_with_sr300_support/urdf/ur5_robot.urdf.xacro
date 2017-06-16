@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro"
+       name="ur5" >
+
+  <!-- common stuff -->
+  <xacro:include filename="$(find ur_description)/urdf/common.gazebo.xacro" />
+
+  <!-- ur5 -->
+  <xacro:include filename="$(find ur5_with_sr300_support)/urdf/ur5.urdf.xacro" />
+
+  <!-- arm -->
+  <xacro:ur5_robot prefix="" joint_limited="false"/>
+
+  <link name="world" />
+
+  <joint name="world_joint" type="fixed">
+    <parent link="world" />
+    <child link = "base_link" />
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+  </joint>
+	
+  <link name="sensor"> 
+ 	  <visual> 
+      <origin xyz="0.0 0.0 0.0" rpy="0 0.0 0.0" /> 
+  	  <geometry> 
+        <box size="0.03 0.12 0.03"/>
+      </geometry> 
+      <material name="Grey" />
+    </visual> 
+    <collision> 
+     <origin xyz="0.0 0.0 0.0" rpy="0 0 0" /> 
+     <geometry> 
+       <box size="0.03 0.12 0.03"/>
+     </geometry> 
+    </collision> 
+  </link>
+
+  <link name="tool_tip" />
+
+  <joint name="tool_to_sensor" type="fixed">
+    <parent link="ee_link"/>
+    <child link="sensor"/>
+    <origin xyz="0.045 0.0 0.035" rpy="0 0.0 0.0" />
+  </joint>
+
+ <joint name="sensor_to_tip" type="fixed">
+   <parent link="sensor"/>
+   <child link="tool_tip"/>
+   <origin xyz="0.01 0.0 0.0" rpy="0 0.0 0" />
+ </joint>
+
+</robot>

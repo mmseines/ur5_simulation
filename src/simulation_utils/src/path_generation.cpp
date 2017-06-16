@@ -34,18 +34,17 @@ namespace tutorial_utilities
 		/*
 			top 4 commented out code somehow crashes. 
 		*/
-		//Eigen::Vector3d translation_vector;
-		//translation_vector = end_pose.translation() - start_pose.translation();
-		//translation_vector = translation_vector/(steps + 1);
-		//Eigen::Translation<double,3> translate(translation_vector);
+		Eigen::Vector3d translation_vector = end_pose.translation() - start_pose.translation();
+		translation_vector = translation_vector/(steps + 1);
+		Eigen::Translation<double,3> translate(translation_vector);
 
 		std::vector<Eigen::Affine3d> poses;
 		poses.push_back(start_pose);
 		poses.push_back(end_pose);
-		//for(int i = 0; i < (steps); ++i)
-		//{
-			//poses.push_back(translate * poses.back());
-		//}
+		for(int i = 0; i < (steps); ++i)
+		{
+			poses.push_back(translate * poses.back());
+		}
 		return poses;
 	}
 }
