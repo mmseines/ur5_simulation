@@ -50,6 +50,7 @@ private:
   ros::Time start_time;
 	timeval start_t;
 	timeval stop_t;
+	long time_stamp;
 };
 
 

@@ -160,21 +160,18 @@ void Write::pointCloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud)
 void Record::jointStateCallback(const sensor_msgs::JointState & msg){
 
 // .... hello darkness my old friend... This took WAAAY to loong to figure out, also why? why? WHYYYY would this be a thing?
-	gettimeofday(stop_t, NULL);
-	long time_between_frames = (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
-	double fps = 1000/(time_between_frames);
-	ROS_INFO("logging with %f FPS");
-	gettimeofday(start_t, NULL);
+	//gettimeofday(stop_t, NULL);
+	//long time_between_frames = (stop_t.tv_sec - start_t.tv_sec)*1000000 +  stop_t.tv_usec - start_t.tv_usec;
+	double fps = 1000/((msg.header.stamp.toSec() - start_time.toSec()) - time_stamp);
+	ROS_INFO_STREAM("logging with: " << fps << " FPS");
+	//gettimeofday(start_t, NULL);
 	sensor_msgs::JointState lul = msg;
 	lul.position[0] = msg.position[2];
 	lul.position[2] = msg.position[0]; 
-	for(int i = 0; i < 6; i++){
-		ROS_INFO( (msg.name[i] + "\n").c_str());
-	}	
 // ---- end fix to get correct order on joint values from message. 
 	rs->setState(lul);
 
-  long time_stamp = msg.header.stamp.toSec() - start_time.toSec();
+  time_stamp = msg.header.stamp.toSec() - start_time.toSec();
   myfile << time_stamp << " ";
   for(int i = 0; i < 6; i++){
     myfile << msg.position[i] << " ";
